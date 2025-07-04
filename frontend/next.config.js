@@ -2,9 +2,7 @@
 const nextConfig = {
   async rewrites() {
     const apiDestination =
-      process.env.NODE_ENV === 'development'
-        ? 'http://localhost:8000/api/:path*'
-        : 'http://crm.move37th.ai:8000/api/:path*';
+      process.env.BACKEND_INTERNAL_URL || 'http://localhost:8000/api/:path*';
 
     return [
       // Rewrite dla health check – gdy host to domena główna
