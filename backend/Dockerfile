@@ -25,7 +25,7 @@ RUN mkdir -p src/routes src/models \
 
 # Kopiowanie kodu źródłowego i pliku .env
 COPY ./src ./src
-COPY .env ./src/.env
+#COPY .env ./src/.env
 
 # Konfiguracja użytkownika
 RUN adduser --disabled-password --gecos '' appuser \
