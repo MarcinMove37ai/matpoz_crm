@@ -34,6 +34,7 @@ const nextConfig = {
       }
     ];
   },
+
   async headers() {
     return [
       {
@@ -47,13 +48,19 @@ const nextConfig = {
       }
     ];
   },
+
+  // WYMAGANE dla Docker deployment na Railway
   output: 'standalone',
   reactStrictMode: true,
-  // Zmiennych środowiskowych używamy tylko do konfiguracji Cognito
+
+  // Explicit env mapping - zapewnia dostępność zmiennych w runtime
   env: {
-    NEXT_PUBLIC_COGNITO_USER_POOL_ID: process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID,
+    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
+    NEXT_PUBLIC_AWS_REGION: process.env.NEXT_PUBLIC_AWS_REGION,
     NEXT_PUBLIC_COGNITO_CLIENT_ID: process.env.NEXT_PUBLIC_COGNITO_CLIENT_ID,
-    NEXT_PUBLIC_AWS_REGION: process.env.NEXT_PUBLIC_AWS_REGION
+    NEXT_PUBLIC_COGNITO_USER_POOL_ID: process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID,
+    NEXT_PUBLIC_HOST: process.env.NEXT_PUBLIC_HOST,
+    BACKEND_INTERNAL_URL: process.env.BACKEND_INTERNAL_URL
   }
 };
 

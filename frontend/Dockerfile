@@ -6,6 +6,23 @@ WORKDIR /app
 # Instalacja dodatkowych narzędzi
 RUN apk add --no-cache libc6-compat
 
+# Railway automatycznie przekazuje wszystkie service variables jako ARG
+# Musimy je zadeklarować, aby były dostępne w Dockerfile
+ARG NEXT_PUBLIC_API_URL
+ARG NEXT_PUBLIC_AWS_REGION
+ARG NEXT_PUBLIC_COGNITO_CLIENT_ID
+ARG NEXT_PUBLIC_COGNITO_USER_POOL_ID
+ARG NEXT_PUBLIC_HOST
+ARG BACKEND_INTERNAL_URL
+
+# Konwertuj ARG na ENV dla Next.js build process
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_AWS_REGION=$NEXT_PUBLIC_AWS_REGION
+ENV NEXT_PUBLIC_COGNITO_CLIENT_ID=$NEXT_PUBLIC_COGNITO_CLIENT_ID
+ENV NEXT_PUBLIC_COGNITO_USER_POOL_ID=$NEXT_PUBLIC_COGNITO_USER_POOL_ID
+ENV NEXT_PUBLIC_HOST=$NEXT_PUBLIC_HOST
+ENV BACKEND_INTERNAL_URL=$BACKEND_INTERNAL_URL
+
 # Instalacja zależności
 COPY package*.json ./
 RUN npm ci
@@ -17,7 +34,7 @@ COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 
-# Budowanie aplikacji
+# Budowanie aplikacji z dostępnymi zmiennymi
 RUN npm run build
 
 # Etap produkcyjny
