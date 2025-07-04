@@ -1,0 +1,56 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Wspólne właściwości dla animacji komunikatów */
+.alert-enter,
+.alert-enter-active,
+.alert-exit,
+.alert-exit-active {
+  transform-origin: top;
+  transition: transform 300ms cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 300ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Początkowy stan wejścia */
+.alert-enter {
+  opacity: 0;
+  transform: scaleY(0);
+}
+
+/* Stan wejścia aktywnego */
+.alert-enter-active {
+  opacity: 1;
+  transform: scaleY(1);
+}
+
+/* Początkowy stan wyjścia */
+.alert-exit {
+  opacity: 1;
+  transform: scaleY(1);
+}
+
+/* Stan wyjścia aktywnego */
+.alert-exit-active {
+  opacity: 0;
+  transform: scaleY(0);
+}
