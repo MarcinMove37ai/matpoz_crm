@@ -2,6 +2,14 @@
 import { Amplify } from 'aws-amplify';
 
 export function configureAmplify() {
+  // --- POCZĄTEK LOGÓW DIAGNOSTYCZNYCH ---
+  console.log("--- Sprawdzanie zmiennych środowiskowych dla Amplify ---");
+  console.log("Zmienna NEXT_PUBLIC_COGNITO_USER_POOL_ID:", process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID);
+  console.log("Zmienna NEXT_PUBLIC_COGNITO_CLIENT_ID:", process.env.NEXT_PUBLIC_COGNITO_CLIENT_ID);
+  console.log("Zmienna NEXT_PUBLIC_AWS_REGION:", process.env.NEXT_PUBLIC_AWS_REGION);
+  console.log("-----------------------------------------------------");
+  // --- KONIEC LOGÓW DIAGNOSTYCZNYCH ---
+
   if (!process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID || !process.env.NEXT_PUBLIC_COGNITO_CLIENT_ID) {
     console.warn("⚠️ Brak konfiguracji Cognito!");
     return;
