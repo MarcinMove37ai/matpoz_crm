@@ -272,6 +272,8 @@ const MapView = () => {
   // Pobieramy fullName bezpośrednio z localStorage
   const storedAuthState = getStoredAuthState();
   const userDisplayName = storedAuthState?.fullName || "Użytkownik";
+  // Sprawdzamy, czy użytkownik ma pozycję "BRANCH"
+  const isBranchUser = storedAuthState?.userRole === 'BRANCH';
 
   // Stan dla filtrów
   const [selectedBranch, setSelectedBranch] = useState<string>("all");
@@ -339,6 +341,14 @@ const MapView = () => {
       setIsClientListOpen(false);
     }
   };
+
+  // Efekt do automatycznego wyłączania checkboxów dla użytkownika 'BRANCH'
+  useEffect(() => {
+    if (isBranchUser) {
+      setShowBusyClients(false);
+      setShowOwnClients(false);
+    }
+  }, [isBranchUser]);
 
   // Sprawdzenie, czy urządzenie jest mobilne
   useEffect(() => {
@@ -1781,40 +1791,45 @@ const MapView = () => {
                             </div>
                           </div>
 
-                          <div className="flex items-center space-x-2">
-                            <Checkbox
-                              id="show-busy-clients"
-                              checked={showBusyClients}
-                              onCheckedChange={(checked) => setShowBusyClients(!!checked)}
-                            />
-                            <div className="flex items-center space-x-1">
-                              <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                              <Label htmlFor="show-busy-clients" className="text-sm font-medium text-gray-600">
-                                Klienci zajęci
-                                {userRadiusKm !== null && radiusStats.totalInRadius > 0 && (
-                                  <span className="ml-1 font-bold">{radiusStats.busyInRadius}</span>
-                                )}
-                              </Label>
+                          {/* Checkbox "Klienci zajęci" - ukryty dla roli BRANCH */}
+                          { !isBranchUser && (
+                            <div className="flex items-center space-x-2">
+                              <Checkbox
+                                id="show-busy-clients"
+                                checked={showBusyClients}
+                                onCheckedChange={(checked) => setShowBusyClients(!!checked)}
+                              />
+                              <div className="flex items-center space-x-1">
+                                <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                                <Label htmlFor="show-busy-clients" className="text-sm font-medium text-gray-600">
+                                  Klienci zajęci
+                                  {userRadiusKm !== null && radiusStats.totalInRadius > 0 && (
+                                    <span className="ml-1 font-bold">{radiusStats.busyInRadius}</span>
+                                  )}
+                                </Label>
+                              </div>
                             </div>
-                          </div>
+                          )}
 
-                          {/* Nowy checkbox dla własnych klientów */}
-                          <div className="flex items-center space-x-2">
-                            <Checkbox
-                              id="show-own-clients"
-                              checked={showOwnClients}
-                              onCheckedChange={(checked) => setShowOwnClients(!!checked)}
-                            />
-                            <div className="flex items-center space-x-1">
-                              <div className="w-3 h-3 rounded-full bg-purple-600"></div>
-                              <Label htmlFor="show-own-clients" className="text-sm font-medium text-gray-600">
-                                Moi klienci
-                                {userRadiusKm !== null && radiusStats.ownInRadius > 0 && (
-                                  <span className="ml-1 font-bold">{radiusStats.ownInRadius}</span>
-                                )}
-                              </Label>
+                          {/* Checkbox "Moi klienci" - ukryty dla roli BRANCH */}
+                          { !isBranchUser && (
+                            <div className="flex items-center space-x-2">
+                              <Checkbox
+                                id="show-own-clients"
+                                checked={showOwnClients}
+                                onCheckedChange={(checked) => setShowOwnClients(!!checked)}
+                              />
+                              <div className="flex items-center space-x-1">
+                                <div className="w-3 h-3 rounded-full bg-purple-600"></div>
+                                <Label htmlFor="show-own-clients" className="text-sm font-medium text-gray-600">
+                                  Moi klienci
+                                  {userRadiusKm !== null && radiusStats.ownInRadius > 0 && (
+                                    <span className="ml-1 font-bold">{radiusStats.ownInRadius}</span>
+                                  )}
+                                </Label>
+                              </div>
                             </div>
-                          </div>
+                          )}
                         </div>
 
                         {/* Wybór promienia i przycisk listy - prawa kolumna na desktop */}
