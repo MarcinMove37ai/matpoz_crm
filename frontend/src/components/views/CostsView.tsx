@@ -34,6 +34,21 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { costsService } from '@/services/costs';
 import { CostData } from '@/types/costs';
 
+const branchMapping: Record<string, string> = {
+    "pcim": "Pcim",
+    "lublin": "Lublin",
+    "rzgów": "Rzgów",
+    "rzgow": "Rzgów",
+    "malbork": "Malbork",
+    "łomża": "Łomża",
+    "lomza": "Łomża",
+    "myślibórz": "Myślibórz",
+    "mysliborz": "Myślibórz",
+    "mg": "MG",
+    "sth": "STH",
+    "bhp": "BHP"
+};
+
 // Stałe dla filtrów
 const monthNames = [
   "Styczeń", "Luty", "Marzec", "Kwiecień", "Maj", "Czerwiec",
@@ -55,16 +70,6 @@ interface SortConfig {
   column: SortColumn | null;
   direction: SortDirection;
 }
-
-// Funkcja pomocnicza do pobierania wartości z ciasteczek
-const getCookie = (name: string): string => {
-  const value = `; ${document.cookie}`;
-  const parts = value.split(`; ${name}=`);
-  if (parts.length === 2) {
-    return parts.pop()?.split(';').shift() || '';
-  }
-  return '';
-};
 
 // Interfejs dla kosztów z API
 interface Cost {
@@ -92,7 +97,7 @@ interface Cost {
 const CostsView = () => {
   const { formatDate, loading: dateLoading, date } = useCurrentDate();
   const { data: yearsData, loading: yearsLoading } = useTransactionYears();
-  const { user } = useAuth();
+  const { user, userRole, userBranch } = useAuth(); // NOWA METODA POBIERANIA DANYCH UŻYTKOWNIKA
 
   // Stan dla filtrów
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
@@ -131,15 +136,6 @@ const CostsView = () => {
     costTypes: [] as string[],
     authors: [] as string[],
     representatives: [] as string[]
-  });
-
-  // Pobieranie roli i oddziału użytkownika
-  const [userRole, setUserRole] = useState<string>(() => {
-    return getCookie('userRole') || '';
-  });
-
-  const [userBranch, setUserBranch] = useState<string>(() => {
-    return getCookie('userBranch') || '';
   });
 
   // Funkcja do sortowania
@@ -327,8 +323,12 @@ const CostsView = () => {
 
       // Ograniczenia wynikające z roli użytkownika
       if (userRole === 'BRANCH' && userBranch) {
-        const normalizedBranch = userBranch.charAt(0).toUpperCase() + userBranch.slice(1).toLowerCase();
-        baseParams.branch = normalizedBranch;
+        const branchKey = userBranch.toLowerCase();
+        const correctBranchName = branchMapping[branchKey] || userBranch;
+        // W funkcji fetchInitialFilterOptions użyj `baseParams`
+        baseParams.branch = correctBranchName;
+        // W funkcji fetchCosts użyj `params`
+        // params.branch = correctBranchName;
       }
 
       if (userRole === 'STAFF' && user?.fullName) {
@@ -413,17 +413,20 @@ const CostsView = () => {
         params.cost_ph = selectedPH;
       }
       // BASIA widzi wyłącznie koszty, których sama jest autorem, bez ograniczeń oddziału
-        if (userRole === 'BASIA' && user?.fullName) {
-          params.cost_author = user.fullName;
-          // Nie dodajemy ograniczenia na oddział
-        }
+      if (userRole === 'BASIA' && user?.fullName) {
+        params.cost_author = user.fullName;
+        // Nie dodajemy ograniczenia na oddział
+      }
 
       // Dodatkowa logika filtrowania na podstawie roli użytkownika
       // BRANCH widzi tylko koszt własnego oddziału
       if (userRole === 'BRANCH' && userBranch) {
-        // Znormalizuj wielkość liter (np. PCIM -> Pcim)
-        const normalizedBranch = userBranch.charAt(0).toUpperCase() + userBranch.slice(1).toLowerCase();
-        params.branch = normalizedBranch;
+        const branchKey = userBranch.toLowerCase();
+        const correctBranchName = branchMapping[branchKey] || userBranch;
+        // W funkcji fetchInitialFilterOptions użyj `baseParams`
+        params.branch = correctBranchName;
+        // W funkcji fetchCosts użyj `params`
+        // params.branch = correctBranchName;
       }
 
       // STAFF widzi wyłącznie koszty, których sam jest autorem
@@ -499,30 +502,6 @@ const CostsView = () => {
       setSelectedYear(yearsData.currentYear);
     }
   }, [selectedYear, yearsData]);
-
-  // Monitorowanie zmian w ciasteczkach - usunięto monitorowanie userName
-  useEffect(() => {
-    const checkCookies = () => {
-      const role = getCookie('userRole');
-      const branch = getCookie('userBranch');
-
-      if (role !== userRole) {
-        setUserRole(role);
-      }
-
-      if (branch !== userBranch) {
-        setUserBranch(branch);
-      }
-    };
-
-    // Sprawdzenie ciasteczek przy pierwszym renderowaniu
-    checkCookies();
-
-    // Ustawienie interwału do okresowego sprawdzania ciasteczek
-    const intervalId = setInterval(checkCookies, 5000);
-
-    return () => clearInterval(intervalId);
-  }, [userRole, userBranch]);
 
   // Obsługa dodania nowego kosztu
   const handleAddCost = (costData: CostData) => {
