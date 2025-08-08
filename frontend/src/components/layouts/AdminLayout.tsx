@@ -76,13 +76,13 @@ const menuItems: MenuItem[] = [
     IconComponent: TrendingUp,
     label: 'Zyski (Oddział)',
     path: '/profits-branch',
-    roles: ['BOARD', 'BRANCH', 'ADMIN']
+    roles: ['BOARD', 'ADMIN']
   },
   {
     IconComponent: TrendingUp,
     label: 'Zyski (PH)',
     path: '/profits-ph',
-    roles: ['BOARD', 'BRANCH', 'REPRESENTATIVE', 'ADMIN']
+    roles: ['BOARD', 'REPRESENTATIVE', 'ADMIN']
   },
   {
     IconComponent: Map,
