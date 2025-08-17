@@ -1306,7 +1306,6 @@ const ProfitsView: React.FC = () => {
   return (
     <div className="space-y-6">
         {/* === POCZĄTEK ZMIAN === */}
-        {/* === POCZĄTEK ZMIAN === */}
         <div className="mb-6">
             {/* --- Układ TYLKO dla mobile (ukryty na sm i większych) --- */}
             <div className="sm:hidden">
@@ -1393,7 +1392,6 @@ const ProfitsView: React.FC = () => {
                 </div>
             </div>
         </div>
-        {/* === KONIEC ZMIAN === */}
         {/* === KONIEC ZMIAN === */}
 
       <div className="sm:hidden text-center mb-4 text-gray-600">
