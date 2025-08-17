@@ -54,3 +54,10 @@ body {
   opacity: 0;
   transform: scaleY(0);
 }
+/* DODAJ TEN FRAGMENT NA KOŃCU PLIKU */
+input:focus,
+input:focus-visible,
+input:focus-within {
+  outline: none !important;
+  box-shadow: none !important;
+}

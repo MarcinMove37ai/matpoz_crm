@@ -55,13 +55,39 @@ const calculateTotalCost = (data: CostsData): CostsData => {
 const TEXT_COLOR = 'text-gray-800';
 const TEXT_COLOR_HOVER = 'hover:text-gray-900';
 
-// Style dla selecta
 const selectStyles = {
-  trigger: "w-full bg-white border-gray-200 text-gray-800 font-medium",
-  content: "bg-white border-gray-200",
-  item: "text-gray-800 font-medium focus:bg-gray-100 focus:text-gray-800 cursor-pointer",
-  placeholder: "text-gray-500 font-medium"
-};
+      /**
+       * Styl dla głównego przycisku (triggera) selekta.
+       * Zmieniono px-4 na px-3, aby zmniejszyć poziomy padding i poprawić balans wizualny.
+       */
+      trigger:
+        "h-11 px-3 py-2 justify-between rounded-lg font-medium transition-all duration-200 " + // ZMIANA TUTAJ
+        "bg-gradient-to-br from-white to-gray-50 border-2 border-gray-200 text-gray-700 " +
+        "hover:border-blue-300 hover:shadow-md hover:bg-gradient-to-br hover:from-blue-50 hover:to-white " +
+        "focus:border-blue-500 focus:ring-4 focus:ring-blue-100 focus:bg-white " +
+        "data-[state=open]:border-blue-500 data-[state=open]:ring-4 data-[state=open]:ring-blue-100",
+
+      /**
+       * Styl dla tekstu zastępczego (placeholder), gdy nic nie jest wybrane.
+       */
+      placeholder:
+        "text-gray-500",
+
+      /**
+       * Styl dla rozwijanego kontenera z opcjami.
+       */
+      content:
+        "bg-white border-2 border-blue-200 rounded-lg shadow-2xl",
+
+      /**
+       * Styl dla pojedynczej opcji na liście.
+       */
+      item:
+        "mx-0 my-0 px-3 py-2.5 text-sm cursor-pointer rounded-lg transition-all duration-150 text-gray-800 " +
+        "hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 hover:text-blue-900 " +
+        "data-[highlighted]:bg-gradient-to-r data-[highlighted]:from-blue-100 data-[highlighted]:to-indigo-100 " +
+        "data-[highlighted]:text-blue-900 data-[highlighted]:outline-none",
+    };
 
 //
 // Typy danych

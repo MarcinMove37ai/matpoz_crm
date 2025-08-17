@@ -157,7 +157,7 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
           "border-2 border-gray-200 hover:border-blue-300 transition-all duration-200",
           "hover:shadow-md hover:bg-gradient-to-br hover:from-blue-50 hover:to-white",
           "focus:border-blue-500 focus:ring-4 focus:ring-blue-100 focus:bg-white",
-          "text-gray-700 font-medium rounded-xl",
+          "text-gray-700 font-medium rounded-lg",
           disabled && "bg-gray-100 opacity-60 cursor-not-allowed hover:border-gray-200 hover:shadow-none",
           isOpen && "border-blue-500 ring-4 ring-blue-100 shadow-lg bg-white"
         )}
@@ -180,7 +180,7 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
       {isOpen && (
         <div
           className={cn(
-            "absolute z-50 w-full bg-white border-2 border-blue-200 rounded-xl shadow-2xl",
+            "absolute z-50 w-full bg-white border-2 border-blue-200 rounded-lg shadow-2xl",
             "backdrop-blur-sm transition-all duration-200 ease-out",
             shouldExpandUp ? "bottom-full mb-2" : "top-full mt-2"
           )}
@@ -193,17 +193,18 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-600" />
               <Input
-                ref={inputRef}
-                type="text"
-                placeholder="Szukaj opcji..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className={cn(
-                  "pl-10 h-10 text-sm border-2 border-transparent bg-white text-gray-900",
-                  "focus:border-blue-400 focus:ring-2 focus:ring-blue-100",
-                  "rounded-lg shadow-sm transition-all duration-200",
-                  "placeholder:text-gray-500"
-                )}
+                  ref={inputRef}
+                  type="text"
+                  placeholder="Szukaj opcji..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className={cn(
+                    "search-input-override", // <--- DODAJ TĘ LINIĘ
+                    "pl-10 h-10 text-sm border-2 border-transparent bg-white text-gray-900",
+                    "focus:border-blue-400 focus:ring-2 focus:ring-blue-100",
+                    "rounded-lg shadow-sm transition-all duration-200",
+                    "placeholder:text-gray-500"
+                  )}
               />
             </div>
           </div>
@@ -262,6 +263,12 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
             transform: scale(1) translateY(0);
           }
         }
+        /* 👇 DODAJ TEN FRAGMENT KODU 👇 */
+          .search-input-override:focus,
+          .search-input-override:focus-visible {
+            outline: none !important;
+          }
+          /* ------------------------------ */
 
         .scrollbar-thin::-webkit-scrollbar {
           width: 6px;
