@@ -859,6 +859,7 @@ const BranchProfitsView: React.FC = () => {
   const [selectedYear, setSelectedYear] = useState<number | undefined>(undefined);
   const { yearsData, loading: yearsLoading, error: yearsError } = useAvailableYears();
   const [reloadTrigger, setReloadTrigger] = useState<number>(0); // Nowy stan do wymuszenia przeładowania
+  const [selectedBranchFilter, setSelectedBranchFilter] = useState<string | null>(null);
 
 const selectStyles = {
       /**
@@ -902,7 +903,13 @@ const selectStyles = {
   }, [selectedYear, yearsData]);
 
   // Lista oddziałów – kolejność ustalana jest statycznie
-  const branches = ["Pcim", "Rzgów", "Malbork", "Lublin", "Łomża", "Myślibórz", "MG", "STH", "BHP"];
+  const branches = ["Pcim", "Rzgów", "Malbork", "Lublin", "Łomża", "Myślibórz"];
+
+  const branchDisplayNames: { [key: string]: string } = {
+    "MG": "MG - Internet",
+    "STH": "STH - Serwis",
+    "BHP": "BHP" // Dla BHP nie ma potrzeby zmiany
+  };
 
   // Sprawdzenie uprawnień użytkownika
   const canViewProfitData = userRole === 'ADMIN' || userRole === 'BOARD' || userRole === 'BRANCH';
@@ -959,7 +966,10 @@ const selectStyles = {
     // Zwiększamy licznik, aby wymusić przeładowanie komponentów
     setReloadTrigger(prev => prev + 1);
   };
-
+  // Obsługa zmiany w filtrze oddziałów
+  const handleBranchFilterChange = (value: string) => {
+    setSelectedBranchFilter(value === 'all' ? null : value);
+  };
   if (!canViewProfitData) {
     return (
       <Card className="w-full">
@@ -979,18 +989,42 @@ const selectStyles = {
 
   return (
     <div className="space-y-8">
-      {/* Nagłówek z selektorem roku */}
-      <div className="flex justify-between items-center mb-6">
+      {/* Nagłówek z selektorami */}
+      <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-3">
         <h2 className="text-xl font-semibold text-gray-800">Zyski Oddział</h2>
-        <div>
+        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+          {/* Selektor oddziałów widoczny dla Admina/Board */}
+          {(userRole === 'ADMIN' || userRole === 'BOARD') && (
+            <Select
+              value={selectedBranchFilter ?? 'all'}
+              onValueChange={handleBranchFilterChange}
+            >
+              <SelectTrigger className={`${selectStyles.trigger} w-full sm:w-40`}>
+                <SelectValue placeholder="Wybierz oddział" />
+              </SelectTrigger>
+              <SelectContent className={`${selectStyles.content} w-full sm:w-40`}>
+                <SelectItem className={selectStyles.item} value="all">Wszystkie</SelectItem>
+                {branches.map((branch) => (
+                  <SelectItem
+                    className={selectStyles.item}
+                    key={branch}
+                    value={branch}
+                  >
+                    {branchDisplayNames[branch] || branch}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          {/* Selektor roku */}
           <Select
             value={selectedYear?.toString() ?? yearsData?.currentYear?.toString()}
-            onValueChange={handleYearChange}  // Używamy nowej funkcji zamiast bezpośredniego ustawienia
+            onValueChange={handleYearChange}
           >
-            <SelectTrigger className={`${selectStyles.trigger} w-32`}>
+            <SelectTrigger className={`${selectStyles.trigger} w-full sm:w-32`}>
               <SelectValue className={selectStyles.placeholder} placeholder="Wybierz rok" />
             </SelectTrigger>
-            <SelectContent className={`${selectStyles.content} w-32`}>
+            <SelectContent className={`${selectStyles.content} w-full sm:w-32`}>
               {yearsLoading ? (
                 <SelectItem value="loading">Ładowanie lat...</SelectItem>
               ) : (
@@ -1027,24 +1061,26 @@ const selectStyles = {
           />
         </div>
       ) : (
-        // Jeśli użytkownik ma rolę ADMIN/BOARD, renderujemy karty dla wszystkich oddziałów
+        // Jeśli użytkownik ma rolę ADMIN/BOARD, renderujemy karty dla wszystkich lub jednego oddziału
         <>
           {/* Karty dla oddziałów – tła ustawiane naprzemiennie lub indywidualnie */}
-          {branches.map((branch, index) => {
-            let bgColor = index % 2 === 0 ? "bg-gray-50" : "bg-gray-100";
-            if (branch === "MG" || branch === "STH" || branch === "BHP") {
-              bgColor = getBgColorForBranch(branch);
-            }
-            return (
-              <React.Fragment key={`branch-${branch}-${reloadTrigger}`}>
-                <BranchProfitsCard
-                  branch={branch}
-                  bgColor={bgColor}
-                  selectedYear={selectedYear}
-                />
-              </React.Fragment>
-            );
-          })}
+          {branches
+            .filter(branch => !selectedBranchFilter || branch === selectedBranchFilter)
+            .map((branch, index) => {
+              let bgColor = index % 2 === 0 ? "bg-gray-50" : "bg-gray-100";
+              if (branch === "MG" || branch === "STH" || branch === "BHP") {
+                bgColor = getBgColorForBranch(branch);
+              }
+              return (
+                <React.Fragment key={`branch-${branch}-${reloadTrigger}`}>
+                  <BranchProfitsCard
+                    branch={branch}
+                    bgColor={bgColor}
+                    selectedYear={selectedYear}
+                  />
+                </React.Fragment>
+              );
+            })}
         </>
       )}
     </div>

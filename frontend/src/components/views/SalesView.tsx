@@ -819,9 +819,15 @@ const OverallAndBranchesSales: React.FC = () => {
   // Lista oddziałów – kolejność ustalana jest statycznie
   const branches = ["Pcim", "Rzgów", "Malbork", "Lublin", "Łomża", "Myślibórz", "MG", "STH", "BHP"];
 
+  const branchDisplayNames: { [key: string]: string } = {
+    "MG": "Internet",
+    "STH": "Serwis"
+  };
+
   // Zamiast ciasteczek używamy kontekstu Auth
   const { userRole: authUserRole, userBranch: authUserBranch } = useAuth();
   const [onlyBranch, setOnlyBranch] = useState<string | null>(null);
+  const [selectedBranchFilter, setSelectedBranchFilter] = useState<string | null>(null);
 
   // Pobieranie i obsługa wyboru roku
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
@@ -866,7 +872,9 @@ const OverallAndBranchesSales: React.FC = () => {
       setOnlyBranch(null);
     }
   }, [authUserRole, authUserBranch]);
-
+  const handleBranchFilterChange = (value: string) => {
+    setSelectedBranchFilter(value === 'all' ? null : value);
+  };
   // Funkcja obliczająca tło karty dla oddziału – analogicznie jak w oryginalnym kodzie
   const getBgColorForBranch = (branch: string): string => {
     let bgColor = "bg-gray-50";
@@ -888,10 +896,34 @@ const OverallAndBranchesSales: React.FC = () => {
 
   return (
     <div className="space-y-8">
-      {/* Nagłówek z tytułem i selektorem roku */}
-      <div className="flex justify-between items-center mb-6">
+      {/* Nagłówek z tytułem i selektorami */}
+      <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-3">
         <h2 className="text-xl font-semibold text-gray-800">Sprzedaż Firma</h2>
-        <div>
+        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+          {/* Selektor oddziałów (tylko dla Admin/Board) */}
+          {(authUserRole === 'ADMIN' || authUserRole === 'BOARD') && (
+            <Select
+              value={selectedBranchFilter ?? 'all'}
+              onValueChange={handleBranchFilterChange}
+            >
+              <SelectTrigger className={`${selectStyles.trigger} w-full sm:w-48`}>
+                <SelectValue placeholder="Filtruj oddział" />
+              </SelectTrigger>
+              <SelectContent className={`${selectStyles.content} w-full sm:w-48`}>
+                <SelectItem className={selectStyles.item} value="all">Wszystkie oddziały</SelectItem>
+                {branches.map((branch) => (
+                  <SelectItem
+                    className={selectStyles.item}
+                    key={branch}
+                    value={branch}
+                  >
+                    {branchDisplayNames[branch] || branch}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          {/* Selektor roku */}
           <Select
             value={selectedYear?.toString() || yearsData?.currentYear?.toString() || currentSystemYear.toString()}
             onValueChange={(value) => setSelectedYear(parseInt(value))}
@@ -963,31 +995,36 @@ const OverallAndBranchesSales: React.FC = () => {
       )}
 
       {onlyBranch && authUserRole !== "ADMIN" && authUserRole !== "BOARD" ? (
-        // Jeśli użytkownik jest oddziałowy (ale nie ADMIN ani BOARD), renderujemy tylko kartę danego oddziału
+        // Widok dla użytkownika z przypisanym oddziałem (bez zmian)
         <div className="space-y-8">
           <SalesView branch={onlyBranch} bgColor={getBgColorForBranch(onlyBranch)} selectedYear={currentYearData} />
         </div>
       ) : (
-        // Jeśli użytkownik nie jest oddziałowy lub ma rolę ADMIN/BOARD, renderujemy globalną kartę oraz karty dla wszystkich oddziałów
+        // Widok dla ADMIN/BOARD
         <>
-          {/* Globalna karta – bez oddziału; tło zielone */}
-          <SalesView bgColor="bg-green-50" selectedYear={currentYearData} />
-          {/* Pozioma linia oddzielająca globalną kartę od kart oddziałowych */}
-          <hr className="border-t border-gray-300 my-4" />
-          {/* Karty dla oddziałów – tła ustawiane naprzemiennie lub indywidualnie */}
-          {branches.map((branch, index) => {
-            let bgColor = index % 2 === 0 ? "bg-gray-50" : "bg-gray-100";
-            if (branch === "MG" || branch === "STH" || branch === "BHP") {
-              bgColor = getBgColorForBranch(branch);
-            }
-            return (
-              <React.Fragment key={branch}>
-                {/* Dodatkowa linia przed kartą oddziału MG */}
-                {branch === "MG" && <hr className="border-t border-gray-300 my-4" />}
-                <SalesView branch={branch} bgColor={bgColor} selectedYear={currentYearData} />
-              </React.Fragment>
-            );
-          })}
+          {/* Pokaż globalną kartę "Suma" tylko wtedy, gdy żaden filtr nie jest aktywny */}
+          {!selectedBranchFilter && (
+            <>
+              <SalesView bgColor="bg-green-50" selectedYear={currentYearData} />
+              <hr className="border-t border-gray-300 my-4" />
+            </>
+          )}
+
+          {/* Renderuj karty oddziałów, filtrując je, jeśli wybrano konkretny oddział */}
+          {branches
+            .filter(branch => !selectedBranchFilter || branch === selectedBranchFilter)
+            .map((branch, index) => {
+              let bgColor = index % 2 === 0 ? "bg-gray-50" : "bg-gray-100";
+              if (branch === "MG" || branch === "STH" || branch === "BHP") {
+                bgColor = getBgColorForBranch(branch);
+              }
+              return (
+                <React.Fragment key={branch}>
+                  {branch === "MG" && !selectedBranchFilter && <hr className="border-t border-gray-300 my-4" />}
+                  <SalesView branch={branch} bgColor={bgColor} selectedYear={currentYearData} />
+                </React.Fragment>
+              );
+            })}
         </>
       )}
     </div>
