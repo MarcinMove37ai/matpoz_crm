@@ -1492,7 +1492,7 @@ const ProfitsPHView: React.FC = () => {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* Nagłówek z selektorami */}
         <div className="mb-6 sm:flex sm:items-center sm:justify-between">
 
