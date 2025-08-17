@@ -849,8 +849,8 @@ export const RepresentativeProfitsCard: React.FC<RepresentativeProfitsCardProps>
               <div className="text-xs text-blue-400">(wartość opłacona)</div>
             </div>
 
-            {/* Saldo z wypłatami */}
-            <div className="text-center">
+            {/* Saldo z wypłatami - ukryte na mobile */}
+            <div className="hidden sm:block text-center">
               <span className="text-xs font-medium text-green-500">Saldo</span>
             </div>
           </div>
@@ -1073,6 +1073,9 @@ const ProfitsPHView: React.FC = () => {
   const [reloadTrigger, setReloadTrigger] = useState<number>(0); // Nowy stan do wymuszenia przeładowania
   const [mounted, setMounted] = useState(false);
 
+  // Nowy stan dla wybranego przedstawiciela z selecta
+  const [selectedRepresentativeFilter, setSelectedRepresentativeFilter] = useState<string | null>(null);
+
   // Nowe stany dla przechowywania centralnie pobranych danych
   const [allSalesData, setAllSalesData] = useState<ApiSalesData[]>([]);
   const [costsData, setCostsData] = useState<ApiCostData[]>([]);
@@ -1148,6 +1151,9 @@ const ProfitsPHView: React.FC = () => {
   // Sprawdzenie uprawnień użytkownika
   const canViewProfitData = userRole === 'ADMIN' || userRole === 'BOARD' || userRole === 'BRANCH' || userRole === 'REPRESENTATIVE';
 
+  // Sprawdzenie czy użytkownik może widzieć select przedstawiciela
+  const canUseRepresentativeFilter = userRole === 'ADMIN' || userRole === 'BOARD' || userRole === 'BRANCH';
+
   // Ustawienie domyślnego roku po załadowaniu dostępnych lat
   useEffect(() => {
     if (!selectedYear && yearsData?.currentYear) {
@@ -1175,6 +1181,17 @@ const ProfitsPHView: React.FC = () => {
     setReloadTrigger(prev => prev + 1);
 
     console.log(`Zmieniono rok na ${newYear}, resetuję listę przedstawicieli i wymuszam przeładowanie`);
+  };
+
+  // Obsługa zmiany wybranego przedstawiciela
+  const handleRepresentativeFilterChange = (value: string) => {
+    const selectedRep = value === 'all' ? null : value;
+    setSelectedRepresentativeFilter(selectedRep);
+
+    // Resetuj listę pustych przedstawicieli przy zmianie filtra
+    setEmptyRepresentatives(new Set());
+
+    console.log(`Zmieniono filtr przedstawiciela na: ${selectedRep || 'wszyscy'}`);
   };
 
   // Nowa funkcja - obliczanie i sortowanie przedstawicieli według wartości zysku
@@ -1382,6 +1399,12 @@ const ProfitsPHView: React.FC = () => {
       }
     }
 
+    // Sprawdź czy użytkownik wybrał konkretnego przedstawiciela z selecta
+    if (canUseRepresentativeFilter && selectedRepresentativeFilter) {
+      setOnlyRepresentative(selectedRepresentativeFilter);
+      return;
+    }
+
     // BRANCH widzą tylko przedstawicieli z ich oddziału
     if (userRole === "BRANCH" && userBranch) {
       setOnlyRepresentative(null);
@@ -1389,7 +1412,7 @@ const ProfitsPHView: React.FC = () => {
       return;
     }
 
-    // ADMIN i BOARD widzą wszystkich
+    // ADMIN i BOARD widzą wszystkich (jeśli nie ma filtra przedstawiciela)
     if (userRole === "ADMIN" || userRole === "BOARD") {
       setOnlyRepresentative(null);
       setBranchFilter(null);
@@ -1399,7 +1422,7 @@ const ProfitsPHView: React.FC = () => {
     // Domyślnie - wyczyść filtry
     setOnlyRepresentative(null);
     setBranchFilter(null);
-  }, [userRole, user, userBranch, representatives, mounted]);
+  }, [userRole, user, userBranch, representatives, mounted, selectedRepresentativeFilter, canUseRepresentativeFilter]);
 
   // Funkcja pomocnicza do ustalania koloru tła dla przedstawiciela
   const getBgColorForRepresentative = (idx: number): string => {
@@ -1442,33 +1465,98 @@ const ProfitsPHView: React.FC = () => {
 
   return (
     <div className="space-y-8">
-      {/* Nagłówek z selektorem roku */}
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold text-gray-800">Zyski PH</h2>
-        <div>
-          <Select
-            value={selectedYear?.toString() ?? yearsData?.currentYear?.toString()}
-            onValueChange={handleYearChange}  // Używamy nowej funkcji zamiast bezpośredniego ustawienia
-          >
-            <SelectTrigger className={`${selectStyles.trigger} w-32`}>
-              <SelectValue className={selectStyles.placeholder} placeholder="Wybierz rok" />
-            </SelectTrigger>
-            <SelectContent className={`${selectStyles.content} w-32`}>
-              {yearsLoading ? (
-                <SelectItem value="loading">Ładowanie lat...</SelectItem>
-              ) : (
-                yearsData?.years?.map((year) => (
+      {/* Nagłówek z selektorami */}
+      <div className="mb-6">
+        {/* ZMIANA: Dodano nowy kontener flex, aby umieścić tytuł i select roku w jednej linii. */}
+        <div className="flex justify-between items-center mb-4">
+          {/* ZMIANA: Usunięto klasę 'mb-4' z H2. */}
+          <h2 className="text-xl font-semibold text-gray-800">Zyski PH</h2>
+
+          {/* ZMIANA: Dodano select roku W WERSJI MOBILNEJ, widoczny tylko na małych ekranach ('sm:hidden'). */}
+          <div className="sm:hidden">
+            <Select
+              value={selectedYear?.toString() ?? yearsData?.currentYear?.toString()}
+              onValueChange={handleYearChange}
+            >
+              <SelectTrigger className={`${selectStyles.trigger} w-32`}>
+                <SelectValue className={selectStyles.placeholder} placeholder="Wybierz rok" />
+              </SelectTrigger>
+              <SelectContent className={`${selectStyles.content} w-32`}>
+                {yearsLoading ? (
+                  <SelectItem value="loading">Ładowanie...</SelectItem>
+                ) : (
+                  yearsData?.years?.map((year) => (
+                    <SelectItem
+                      className={selectStyles.item}
+                      key={year}
+                      value={year.toString()}
+                    >
+                      {year}
+                    </SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {/* ZMIANA: Zmieniono kontener na filtry. Teraz obsługuje on select przedstawiciela i desktopową wersję selecta roku. */}
+        <div className="flex flex-col sm:flex-row sm:justify-end gap-3">
+          {/* Select przedstawiciela - pozostaje bez zmian */}
+          {canUseRepresentativeFilter && (
+            <Select
+              value={selectedRepresentativeFilter || 'all'}
+              onValueChange={handleRepresentativeFilterChange}
+            >
+              <SelectTrigger className={`${selectStyles.trigger} w-full sm:w-48`}>
+                <SelectValue className={selectStyles.placeholder} placeholder="Wybierz przedstawiciela" />
+              </SelectTrigger>
+              <SelectContent className={`${selectStyles.content} w-full sm:w-48`}>
+                <SelectItem
+                  className={selectStyles.item}
+                  value="all"
+                >
+                  Wszyscy
+                </SelectItem>
+                {sortedRepresentatives.map((rep) => (
                   <SelectItem
                     className={selectStyles.item}
-                    key={year}
-                    value={year.toString()}
+                    key={rep}
+                    value={rep}
                   >
-                    {year}
+                    {rep}
                   </SelectItem>
-                ))
-              )}
-            </SelectContent>
-          </Select>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+
+          {/* ZMIANA: Oryginalny select roku teraz jest W WERSJI DESKTOPOWEJ, ukryty na małych ekranach ('hidden sm:block'). */}
+          <div className="hidden sm:block">
+            <Select
+              value={selectedYear?.toString() ?? yearsData?.currentYear?.toString()}
+              onValueChange={handleYearChange}
+            >
+              <SelectTrigger className={`${selectStyles.trigger} w-full sm:w-32`}>
+                <SelectValue className={selectStyles.placeholder} placeholder="Wybierz rok" />
+              </SelectTrigger>
+              <SelectContent className={`${selectStyles.content} w-full sm:w-32`}>
+                {yearsLoading ? (
+                  <SelectItem value="loading">Ładowanie lat...</SelectItem>
+                ) : (
+                  yearsData?.years?.map((year) => (
+                    <SelectItem
+                      className={selectStyles.item}
+                      key={year}
+                      value={year.toString()}
+                    >
+                      {year}
+                    </SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </div>
 
@@ -1481,7 +1569,7 @@ const ProfitsPHView: React.FC = () => {
       </div>
 
       {onlyRepresentative ? (
-        // Jeśli użytkownik jest przedstawicielem, pokazujemy tylko jego kartę
+        // Jeśli użytkownik jest przedstawicielem lub wybrał konkretnego przedstawiciela, pokazujemy tylko jego kartę
         <div key={`rep-${onlyRepresentative}-${reloadTrigger}`}>
           <RepresentativeProfitsCard
             representative={onlyRepresentative}
