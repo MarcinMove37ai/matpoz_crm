@@ -988,95 +988,97 @@ const selectStyles = {
   }
 
   return (
-    <div className="space-y-8">
-      {/* Nagłówek z selektorami - struktura ujednolicona z innymi widokami */}
-      <div className="mb-6">
-        {/* Kontener dla tytułu i mobilnego selektora roku */}
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-semibold text-gray-800">Zyski Oddział</h2>
+    <div className="space-y-6">
+      {/* Nagłówek z selektorami */}
+        <div className="mb-6 sm:flex sm:items-center sm:justify-between">
 
-          {/* WERSJA MOBILNA selektora roku (widoczny tylko na małych ekranach) */}
-          <div className="sm:hidden">
-            <Select
-              value={selectedYear?.toString() ?? yearsData?.currentYear?.toString()}
-              onValueChange={handleYearChange}
-            >
-              <SelectTrigger className={`${selectStyles.trigger} w-32`}>
-                <SelectValue className={selectStyles.placeholder} placeholder="Wybierz rok" />
-              </SelectTrigger>
-              <SelectContent className={`${selectStyles.content} w-32`}>
-                {yearsLoading ? (
-                  <SelectItem value="loading">Ładowanie lat...</SelectItem>
-                ) : (
-                  yearsData?.years?.map((year) => (
+          {/* Kontener dla tytułu i mobilnego selektora roku */}
+          <div className="flex justify-between items-center mb-4 sm:mb-0">
+            <h2 className="text-xl font-semibold text-gray-800">Zyski Oddział</h2>
+
+            {/* WERSJA MOBILNA selektora roku (widoczny tylko na małych ekranach) */}
+            <div className="sm:hidden">
+              <Select
+                value={selectedYear?.toString() ?? yearsData?.currentYear?.toString()}
+                onValueChange={handleYearChange}
+              >
+                <SelectTrigger className={`${selectStyles.trigger} w-32`}>
+                  <SelectValue className={selectStyles.placeholder} placeholder="Wybierz rok" />
+                </SelectTrigger>
+                <SelectContent className={`${selectStyles.content} w-32`}>
+                  {yearsLoading ? (
+                    <SelectItem value="loading">Ładowanie lat...</SelectItem>
+                  ) : (
+                    yearsData?.years?.map((year) => (
+                      <SelectItem
+                        className={selectStyles.item}
+                        key={year}
+                        value={year.toString()}
+                      >
+                        {year}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Kontener na filtry (selektor oddziału i desktopowy selektor roku) */}
+          <div className="flex flex-col sm:flex-row sm:justify-end gap-3">
+
+            {/* Selektor oddziałów widoczony dla Admina/Board */}
+            {(userRole === 'ADMIN' || userRole === 'BOARD') && (
+              <Select
+                value={selectedBranchFilter ?? 'all'}
+                onValueChange={handleBranchFilterChange}
+              >
+                <SelectTrigger className={`${selectStyles.trigger} w-full sm:w-40`}>
+                  <SelectValue placeholder="Wybierz oddział" />
+                </SelectTrigger>
+                <SelectContent className={`${selectStyles.content} w-full sm:w-40`}>
+                  <SelectItem className={selectStyles.item} value="all">Wszystkie</SelectItem>
+                  {branches.map((branch) => (
                     <SelectItem
                       className={selectStyles.item}
-                      key={year}
-                      value={year.toString()}
+                      key={branch}
+                      value={branch}
                     >
-                      {year}
+                      {branchDisplayNames[branch] || branch}
                     </SelectItem>
-                  ))
-                )}
-              </SelectContent>
-            </Select>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+
+            {/* WERSJA DESKTOPOWA selektora roku (ukryty na małych ekranach) */}
+            <div className="hidden sm:block">
+              <Select
+                value={selectedYear?.toString() ?? yearsData?.currentYear?.toString()}
+                onValueChange={handleYearChange}
+              >
+                <SelectTrigger className={`${selectStyles.trigger} w-full sm:w-32`}>
+                  <SelectValue className={selectStyles.placeholder} placeholder="Wybierz rok" />
+                </SelectTrigger>
+                <SelectContent className={`${selectStyles.content} w-full sm:w-32`}>
+                  {yearsLoading ? (
+                    <SelectItem value="loading">Ładowanie lat...</SelectItem>
+                  ) : (
+                    yearsData?.years?.map((year) => (
+                      <SelectItem
+                        className={selectStyles.item}
+                        key={year}
+                        value={year.toString()}
+                      >
+                        {year}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
-
-        {/* Kontener na filtry (selektor oddziału i desktopowy selektor roku) */}
-        <div className="flex flex-col sm:flex-row sm:justify-end gap-3">
-          {/* Selektor oddziałów widoczony dla Admina/Board */}
-          {(userRole === 'ADMIN' || userRole === 'BOARD') && (
-            <Select
-              value={selectedBranchFilter ?? 'all'}
-              onValueChange={handleBranchFilterChange}
-            >
-              <SelectTrigger className={`${selectStyles.trigger} w-full sm:w-40`}>
-                <SelectValue placeholder="Wybierz oddział" />
-              </SelectTrigger>
-              <SelectContent className={`${selectStyles.content} w-full sm:w-40`}>
-                <SelectItem className={selectStyles.item} value="all">Wszystkie</SelectItem>
-                {branches.map((branch) => (
-                  <SelectItem
-                    className={selectStyles.item}
-                    key={branch}
-                    value={branch}
-                  >
-                    {branchDisplayNames[branch] || branch}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-
-          {/* WERSJA DESKTOPOWA selektora roku (ukryty na małych ekranach) */}
-          <div className="hidden sm:block">
-            <Select
-              value={selectedYear?.toString() ?? yearsData?.currentYear?.toString()}
-              onValueChange={handleYearChange}
-            >
-              <SelectTrigger className={`${selectStyles.trigger} w-full sm:w-32`}>
-                <SelectValue className={selectStyles.placeholder} placeholder="Wybierz rok" />
-              </SelectTrigger>
-              <SelectContent className={`${selectStyles.content} w-full sm:w-32`}>
-                {yearsLoading ? (
-                  <SelectItem value="loading">Ładowanie lat...</SelectItem>
-                ) : (
-                  yearsData?.years?.map((year) => (
-                    <SelectItem
-                      className={selectStyles.item}
-                      key={year}
-                      value={year.toString()}
-                    >
-                      {year}
-                    </SelectItem>
-                  ))
-                )}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-      </div>
 
       {/* Komunikat wyświetlany na urządzeniach mobilnych i małych ekranach - zaktualizowany */}
       <div className="sm:hidden text-center mb-4 text-gray-600">

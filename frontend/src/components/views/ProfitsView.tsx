@@ -1216,9 +1216,16 @@ const ProfitsView: React.FC = () => {
   const [onlyBranch, setOnlyBranch] = useState<string | null>(null);
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
   const { yearsData, loading: yearsLoading, error: yearsError } = useAvailableYears();
+  const [selectedBranchFilter, setSelectedBranchFilter] = useState<string | null>(null);
 
   // Lista oddziałów – kolejność ustalana jest statycznie
   const branches = ["Pcim", "Rzgów", "Malbork", "Lublin", "Łomża", "Myślibórz", "MG", "STH", "BHP"];
+
+  const branchDisplayNames: { [key: string]: string } = {
+    "MG": "MG - Internet",
+    "STH": "STH - Serwis",
+    "BHP": "BHP"
+  };
 
   // Sprawdzenie uprawnień użytkownika
   const canViewProfitData = userRole === 'ADMIN' || userRole === 'BOARD';
@@ -1275,6 +1282,10 @@ const ProfitsView: React.FC = () => {
     return bgColor;
   };
 
+  const handleBranchFilterChange = (value: string) => {
+    setSelectedBranchFilter(value === 'all' ? null : value);
+  };
+
   if (!canViewProfitData) {
     return (
       <Card className="w-full">
@@ -1293,74 +1304,97 @@ const ProfitsView: React.FC = () => {
   }
 
   return (
-    <div className="space-y-8">
-      {/* Selektor roku */}
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold text-gray-800">Zyski Firma</h2>
-        <div>
-          <Select
-            value={selectedYear?.toString() ?? yearsData?.currentYear?.toString()}
-            onValueChange={(value) => setSelectedYear(parseInt(value))}
-          >
-            <SelectTrigger className={`${selectStyles.trigger} w-32`}>
-              <SelectValue className={selectStyles.placeholder} placeholder="Wybierz rok" />
-            </SelectTrigger>
-            <SelectContent className={`${selectStyles.content} w-32`}>
-              {yearsLoading ? (
-                <SelectItem value="loading">Ładowanie lat...</SelectItem>
-              ) : (
-                yearsData?.years?.map((year) => (
-                  <SelectItem
-                    className={selectStyles.item}
-                    key={year}
-                    value={year.toString()}
-                  >
-                    {year}
-                  </SelectItem>
-                ))
-              )}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
+    <div className="space-y-6">
+        <div className="flex flex-wrap items-center justify-between gap-y-4 mb-6">
 
-      {/* Komunikat wyświetlany na urządzeniach mobilnych */}
+            {/* Nowy kontener grupujący tytuł i selektor roku, z responsywnymi klasami */}
+            <div className="flex w-full items-center justify-between sm:w-auto sm:justify-start sm:gap-4">
+                <h2 className="text-xl font-semibold text-gray-800">Zyski Firma</h2>
+
+                <Select
+                    value={selectedYear?.toString() ?? yearsData?.currentYear?.toString()}
+                    onValueChange={(value) => setSelectedYear(parseInt(value))}
+                >
+                    <SelectTrigger className={`${selectStyles.trigger} w-32`}>
+                        <SelectValue className={selectStyles.placeholder} placeholder="Wybierz rok" />
+                    </SelectTrigger>
+                    <SelectContent className={`${selectStyles.content} w-32`}>
+                        {yearsLoading ? (
+                            <SelectItem value="loading">Ładowanie lat...</SelectItem>
+                        ) : (
+                            yearsData?.years?.map((year) => (
+                                <SelectItem
+                                    className={selectStyles.item}
+                                    key={year}
+                                    value={year.toString()}
+                                >
+                                    {year}
+                                </SelectItem>
+                            ))
+                        )}
+                    </SelectContent>
+                </Select>
+            </div>
+
+            {/* Selektor oddziału jako osobny element, zachowuje swoje responsywne klasy */}
+            {(userRole === 'ADMIN' || userRole === 'BOARD') && (
+                <Select
+                    value={selectedBranchFilter ?? 'all'}
+                    onValueChange={handleBranchFilterChange}
+                >
+                    <SelectTrigger className={`${selectStyles.trigger} w-full sm:w-48`}>
+                        <SelectValue placeholder="Filtruj oddział" />
+                    </SelectTrigger>
+                    <SelectContent className={`${selectStyles.content} w-full sm:w-48`}>
+                        <SelectItem className={selectStyles.item} value="all">Wszystkie</SelectItem>
+                        {branches.map((branch) => (
+                            <SelectItem
+                                className={selectStyles.item}
+                                key={branch}
+                                value={branch}
+                            >
+                                {branchDisplayNames[branch] || branch}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            )}
+        </div>
+
       <div className="sm:hidden text-center mb-4 text-gray-600">
         <div>
-          Pokazane tylko najważniejsze dane<br />
-          Po więcej danych obróć ekran <RotateCcw className="inline-block h-4 w-4 text-gray-500" />
+          Po więcej danych obróć ekran <RotateCcw className="inline-block h-4 w-4 text-gray-500" /><br />
           lub użyj komputera <Monitor className="inline-block h-4 w-4 text-gray-500" />
         </div>
       </div>
 
       {selectedYear ? (
         onlyBranch && userRole !== "ADMIN" && userRole !== "BOARD" ? (
-          // Jeśli użytkownik jest oddziałowy (ale nie ADMIN ani BOARD), renderujemy tylko kartę danego oddziału
-          <div className="space-y-8">
+          <div className="space-y-6">
             <ProfitsCard branch={onlyBranch} bgColor={getBgColorForBranch(onlyBranch)} selectedYear={selectedYear} />
           </div>
         ) : (
-          // Jeśli użytkownik nie jest oddziałowy lub ma rolę ADMIN/BOARD, renderujemy globalną kartę oraz karty dla wszystkich oddziałów
           <>
-            {/* Globalna karta – bez oddziału; tło zielone */}
-            <ProfitsCard bgColor="bg-green-50" selectedYear={selectedYear} />
+            {!selectedBranchFilter && (
+                <>
+                    <ProfitsCard bgColor="bg-green-50" selectedYear={selectedYear} />
+                    <hr className="border-t border-gray-300 my-4" />
+                </>
+            )}
 
-            {/* Pozioma linia oddzielająca globalną kartę od kart oddziałowych */}
-            <hr className="border-t border-gray-300 my-4" />
-
-            {/* Karty dla oddziałów – tła ustawiane naprzemiennie lub indywidualnie */}
-            {branches.map((branch, index) => {
-              let bgColor = index % 2 === 0 ? "bg-gray-50" : "bg-gray-100";
-              if (branch === "MG" || branch === "STH" || branch === "BHP") {
-                bgColor = getBgColorForBranch(branch);
-              }
-              return (
-                <React.Fragment key={branch}>
-                  {/* Dodatkowa linia przed kartą oddziału MG */}
-                  {branch === "MG" && <hr className="border-t border-gray-300 my-4" />}
-                  <ProfitsCard branch={branch} bgColor={bgColor} selectedYear={selectedYear} />
-                </React.Fragment>
-              );
+            {branches
+              .filter(branch => !selectedBranchFilter || branch === selectedBranchFilter)
+              .map((branch, index) => {
+                let bgColor = index % 2 === 0 ? "bg-gray-50" : "bg-gray-100";
+                if (branch === "MG" || branch === "STH" || branch === "BHP") {
+                  bgColor = getBgColorForBranch(branch);
+                }
+                return (
+                  <React.Fragment key={branch}>
+                    {branch === "MG" && !selectedBranchFilter && <hr className="border-t border-gray-300 my-4" />}
+                    <ProfitsCard branch={branch} bgColor={bgColor} selectedYear={selectedYear} />
+                  </React.Fragment>
+                );
             })}
           </>
         )

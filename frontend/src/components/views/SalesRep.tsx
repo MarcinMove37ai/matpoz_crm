@@ -561,86 +561,88 @@ const RepresentativesSalesView: React.FC = () => {
   const canUseRepresentativeFilter = authUserRole === 'ADMIN' || authUserRole === 'BOARD' || authUserRole === 'BRANCH';
 
   return (
-    <div className="space-y-8">
-      {/* Nagłówek z selektorami - struktura analogiczna do ProfitsPHView */}
-      <div className="mb-6">
-        {/* Kontener dla tytułu i mobilnego selektora roku */}
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-semibold text-gray-800">Przedstawiciele</h2>
+    <div className="space-y-6">
+      {/* Nagłówek z selektorami - struktura analogiczna do ProfitsPHView */}{/* Nagłówek z selektorami */}
+        <div className="mb-6 sm:flex sm:items-center sm:justify-between">
 
-          {/* WERSJA MOBILNA selektora roku (widoczny tylko na małych ekranach) */}
-          <div className="sm:hidden">
-            <Select
-              value={selectedYear?.toString() ?? yearsData?.currentYear?.toString()}
-              onValueChange={(value) => setSelectedYear(parseInt(value))}
-            >
-              <SelectTrigger className={`${selectStyles.trigger} w-32`}>
-                <SelectValue className={selectStyles.placeholder} placeholder="Wybierz rok" />
-              </SelectTrigger>
-              <SelectContent className={`${selectStyles.content} w-32`}>
-                {yearsLoading ? (
-                  <SelectItem value="loading">Ładowanie...</SelectItem>
-                ) : (
-                  yearsData?.years?.map((year) => (
-                    <SelectItem
-                      className={selectStyles.item}
-                      key={year}
-                      value={year.toString()}
-                    >
-                      {year}
-                    </SelectItem>
-                  ))
-                )}
-              </SelectContent>
-            </Select>
+          {/* Kontener dla tytułu i mobilnego selektora roku */}
+          <div className="flex justify-between items-center mb-4 sm:mb-0">
+            <h2 className="text-xl font-semibold text-gray-800">Przedstawiciele</h2>
+
+            {/* WERSJA MOBILNA selektora roku (widoczny tylko na małych ekranach) */}
+            <div className="sm:hidden">
+              <Select
+                value={selectedYear?.toString() ?? yearsData?.currentYear?.toString()}
+                onValueChange={(value) => setSelectedYear(parseInt(value))}
+              >
+                <SelectTrigger className={`${selectStyles.trigger} w-32`}>
+                  <SelectValue className={selectStyles.placeholder} placeholder="Wybierz rok" />
+                </SelectTrigger>
+                <SelectContent className={`${selectStyles.content} w-32`}>
+                  {yearsLoading ? (
+                    <SelectItem value="loading">Ładowanie...</SelectItem>
+                  ) : (
+                    yearsData?.years?.map((year) => (
+                      <SelectItem
+                        className={selectStyles.item}
+                        key={year}
+                        value={year.toString()}
+                      >
+                        {year}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Kontener na filtry (selektor przedstawiciela i desktopowy selektor roku) */}
+          <div className="flex flex-col sm:flex-row sm:justify-end gap-3">
+
+            {/* SearchableSelect dla przedstawicieli */}
+            {canUseRepresentativeFilter && !onlyRepresentative && (
+              <SearchableSelect
+                className="w-full sm:w-48"
+                placeholder="Wybierz przedstawiciela"
+                value={representativeFilter || 'all'}
+                onValueChange={handleRepresentativeFilterChange}
+                items={[
+                  { value: 'all', label: 'Wszyscy' },
+                  ...sortedRepresentatives.map(rep => ({ value: rep, label: rep }))
+                ]}
+                expandUpward={false}
+              />
+            )}
+
+            {/* WERSJA DESKTOPOWA selektora roku (ukryty na małych ekranach) */}
+            <div className="hidden sm:block">
+              <Select
+                value={selectedYear?.toString() ?? yearsData?.currentYear?.toString()}
+                onValueChange={(value) => setSelectedYear(parseInt(value))}
+              >
+                <SelectTrigger className={`${selectStyles.trigger} w-full sm:w-32`}>
+                  <SelectValue className={selectStyles.placeholder} placeholder="Wybierz rok" />
+                </SelectTrigger>
+                <SelectContent className={`${selectStyles.content} w-full sm:w-32`}>
+                  {yearsLoading ? (
+                    <SelectItem value="loading">Ładowanie lat...</SelectItem>
+                  ) : (
+                    yearsData?.years?.map((year) => (
+                      <SelectItem
+                        className={selectStyles.item}
+                        key={year}
+                        value={year.toString()}
+                      >
+                        {year}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
-
-        {/* Kontener na filtry (selektor przedstawiciela i desktopowy selektor roku) */}
-        <div className="flex flex-col sm:flex-row sm:justify-end gap-3">
-          {/* SearchableSelect dla przedstawicieli */}
-          {canUseRepresentativeFilter && !onlyRepresentative && (
-            <SearchableSelect
-              className="w-full sm:w-48"
-              placeholder="Wybierz przedstawiciela"
-              value={representativeFilter || 'all'}
-              onValueChange={handleRepresentativeFilterChange}
-              items={[
-                { value: 'all', label: 'Wszyscy' },
-                ...sortedRepresentatives.map(rep => ({ value: rep, label: rep }))
-              ]}
-              expandUpward={false}
-            />
-          )}
-
-          {/* WERSJA DESKTOPOWA selektora roku (ukryty na małych ekranach) */}
-          <div className="hidden sm:block">
-            <Select
-              value={selectedYear?.toString() ?? yearsData?.currentYear?.toString()}
-              onValueChange={(value) => setSelectedYear(parseInt(value))}
-            >
-              <SelectTrigger className={`${selectStyles.trigger} w-full sm:w-32`}>
-                <SelectValue className={selectStyles.placeholder} placeholder="Wybierz rok" />
-              </SelectTrigger>
-              <SelectContent className={`${selectStyles.content} w-full sm:w-32`}>
-                {yearsLoading ? (
-                  <SelectItem value="loading">Ładowanie lat...</SelectItem>
-                ) : (
-                  yearsData?.years?.map((year) => (
-                    <SelectItem
-                      className={selectStyles.item}
-                      key={year}
-                      value={year.toString()}
-                    >
-                      {year}
-                    </SelectItem>
-                  ))
-                )}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-      </div>
 
       <div className="sm:hidden text-center mb-2 text-gray-600">
         <div>

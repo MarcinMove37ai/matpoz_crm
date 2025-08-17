@@ -604,148 +604,148 @@ const CostsSummaryView: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Komunikat wyświetlany na urządzeniach mobilnych (poniżej md) */}
-      <div className="md:hidden text-center mb-4 text-gray-600">
-        <div>
-          Po więcej danych obróć ekran <RotateCcw className="inline-block h-4 w-4 text-gray-500" /><br />
-          lub użyj komputera <Monitor className="inline-block h-4 w-4 text-gray-500" />
-        </div>
-      </div>
-
-      {/* Ujednolicony nagłówek z filtrami - z responsywnym układem */}
-      <div className="mb-6">
-        {/* ===== WERSJA MOBILNA (widoczna do breakpointu 'sm') ===== */}
-        <div className="sm:hidden">
-          {/* Wiersz 1: Tytuł i selektor roku */}
-          <div className="flex justify-between items-center">
-            <h2 className="text-xl font-semibold text-gray-800">Podział Kosztów</h2>
-            {/* Selektor roku jest tutaj, obok tytułu */}
-            <Select
-              value={selectedYear?.toString() ?? yearsData?.currentYear?.toString()}
-              onValueChange={(value) => setSelectedYear(parseInt(value))}
-            >
-              <SelectTrigger className={`${selectStyles.trigger} w-32`}>
-                <SelectValue placeholder="Wybierz rok" />
-              </SelectTrigger>
-              <SelectContent className={`${selectStyles.content} w-32`}>
-                {yearsLoading ? (
-                  <SelectItem value="loading">Ładowanie...</SelectItem>
-                ) : (
-                  yearsData?.years?.map((year) => (
-                    <SelectItem className={selectStyles.item} key={year} value={year.toString()}>
-                      {year}
-                    </SelectItem>
-                  ))
-                )}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Wiersz 2: Selektor oddziałów (jeśli dostępny) */}
-          {(authUserRole === 'ADMIN' || authUserRole === 'BOARD') && (
-            <div className="mt-3"> {/* Dodatkowy margines górny dla odstępu */}
-              <Select
-                value={selectedBranchFilter ?? 'all'}
-                onValueChange={handleBranchFilterChange}
-              >
-                <SelectTrigger className={`${selectStyles.trigger} w-full`}>
-                  <SelectValue placeholder="Filtruj oddział" />
-                </SelectTrigger>
-                <SelectContent className={`${selectStyles.content} w-full`}>
-                  <SelectItem className={selectStyles.item} value="all">Wszystkie oddziały</SelectItem>
-                  {branches.map((branch) => (
-                    <SelectItem className={selectStyles.item} key={branch} value={branch}>
-                      {branch}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-        </div>
-
-        {/* ===== WERSJA DESKTOP (widoczna od 'sm' wzwyż) ===== */}
-        <div className="hidden sm:flex sm:justify-between sm:items-center">
-          <h2 className="text-xl font-semibold text-gray-800">Podział Kosztów</h2>
-
-          {/* Kontener na oba filtry, ułożone obok siebie po prawej stronie */}
-          <div className="flex items-center gap-3">
-            {(authUserRole === 'ADMIN' || authUserRole === 'BOARD') && (
-              <Select
-                value={selectedBranchFilter ?? 'all'}
-                onValueChange={handleBranchFilterChange}
-              >
-                <SelectTrigger className={`${selectStyles.trigger} w-48`}>
-                  <SelectValue placeholder="Filtruj oddział" />
-                </SelectTrigger>
-                <SelectContent className={`${selectStyles.content} w-48`}>
-                  <SelectItem className={selectStyles.item} value="all">Wszystkie oddziały</SelectItem>
-                  {branches.map((branch) => (
-                    <SelectItem className={selectStyles.item} key={branch} value={branch}>
-                      {branch}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+  {/* Ujednolicony nagłówek z filtrami - z responsywnym układem */}
+  <div className="mb-6">
+    {/* ===== WERSJA MOBILNA (widoczna do breakpointu 'sm') ===== */}
+    <div className="sm:hidden">
+      {/* Wiersz 1: Tytuł i selektor roku */}
+      <div className="flex justify-between items-center">
+        <h2 className="text-xl font-semibold text-gray-800">Podział Kosztów</h2>
+        {/* Selektor roku jest tutaj, obok tytułu */}
+        <Select
+          value={selectedYear?.toString() ?? yearsData?.currentYear?.toString()}
+          onValueChange={(value) => setSelectedYear(parseInt(value))}
+        >
+          <SelectTrigger className={`${selectStyles.trigger} w-32`}>
+            <SelectValue placeholder="Wybierz rok" />
+          </SelectTrigger>
+          <SelectContent className={`${selectStyles.content} w-32`}>
+            {yearsLoading ? (
+              <SelectItem value="loading">Ładowanie...</SelectItem>
+            ) : (
+              yearsData?.years?.map((year) => (
+                <SelectItem className={selectStyles.item} key={year} value={year.toString()}>
+                  {year}
+                </SelectItem>
+              ))
             )}
-            <Select
-              value={selectedYear?.toString() ?? yearsData?.currentYear?.toString()}
-              onValueChange={(value) => setSelectedYear(parseInt(value))}
-            >
-              <SelectTrigger className={`${selectStyles.trigger} w-32`}>
-                <SelectValue placeholder="Wybierz rok" />
-              </SelectTrigger>
-              <SelectContent className={`${selectStyles.content} w-32`}>
-                {yearsLoading ? (
-                  <SelectItem value="loading">Ładowanie...</SelectItem>
-                ) : (
-                  yearsData?.years?.map((year) => (
-                    <SelectItem className={selectStyles.item} key={year} value={year.toString()}>
-                      {year}
-                    </SelectItem>
-                  ))
-                )}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
+          </SelectContent>
+        </Select>
       </div>
 
-      {onlyBranch && authUserRole !== "ADMIN" && authUserRole !== "BOARD" ? (
-        // Jeśli użytkownik jest oddziałowy (ale nie ADMIN ani BOARD), renderujemy tylko kartę danego oddziału
-        <div className="space-y-6">
-          <CostsSummaryCard branch={onlyBranch} bgColor={getBgColorForBranch(onlyBranch)} selectedYear={selectedYear} />
+      {/* Wiersz 2: Selektor oddziałów (jeśli dostępny) */}
+      {(authUserRole === 'ADMIN' || authUserRole === 'BOARD') && (
+        <div className="mt-3"> {/* Dodatkowy margines górny dla odstępu */}
+          <Select
+            value={selectedBranchFilter ?? 'all'}
+            onValueChange={handleBranchFilterChange}
+          >
+            <SelectTrigger className={`${selectStyles.trigger} w-full`}>
+              <SelectValue placeholder="Filtruj oddział" />
+            </SelectTrigger>
+            <SelectContent className={`${selectStyles.content} w-full`}>
+              <SelectItem className={selectStyles.item} value="all">Wszystkie</SelectItem>
+              {branches.map((branch) => (
+                <SelectItem className={selectStyles.item} key={branch} value={branch}>
+                  {branch}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
-      ) : (
-        // Jeśli użytkownik nie jest oddziałowy lub ma rolę ADMIN/BOARD, renderujemy globalną kartę oraz karty dla wszystkich oddziałów
-        <>
-          {/* Globalna karta – bez oddziału; tło zielone */}
-          <CostsSummaryCard bgColor="bg-green-50" selectedYear={selectedYear} />
-
-          {/* Pozioma linia oddzielająca globalną kartę od kart oddziałowych */}
-          <hr className="border-t border-gray-300 my-4" />
-
-          {/* Karty dla oddziałów – w układzie siatki */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {branches
-              .filter(branch => !selectedBranchFilter || branch === selectedBranchFilter) // <-- DODAJ TEN FILTR
-              .map((branch, index) => {
-              let bgColor = index % 2 === 0 ? "bg-gray-50" : "bg-gray-100";
-              if (branch === "MG" || branch === "STH" || branch === "BHP") {
-                bgColor = getBgColorForBranch(branch);
-              }
-              return (
-                <div key={branch}>
-                  {/* Dodatkowa linia przed kartą oddziału MG w widoku mobilnym */}
-                  {branch === "MG" && <hr className="border-t border-gray-300 my-4 md:hidden" />}
-                  <CostsSummaryCard branch={branch} bgColor={bgColor} selectedYear={selectedYear} />
-                </div>
-              );
-            })}
-          </div>
-        </>
       )}
     </div>
+
+    {/* ===== WERSJA DESKTOP (widoczna od 'sm' wzwyż) ===== */}
+    <div className="hidden sm:flex sm:justify-between sm:items-center">
+      <h2 className="text-xl font-semibold text-gray-800">Podział Kosztów</h2>
+
+      {/* Kontener na oba filtry, ułożone obok siebie po prawej stronie */}
+      <div className="flex items-center gap-3">
+        {(authUserRole === 'ADMIN' || authUserRole === 'BOARD') && (
+          <Select
+            value={selectedBranchFilter ?? 'all'}
+            onValueChange={handleBranchFilterChange}
+          >
+            <SelectTrigger className={`${selectStyles.trigger} w-48`}>
+              <SelectValue placeholder="Filtruj oddział" />
+            </SelectTrigger>
+            <SelectContent className={`${selectStyles.content} w-48`}>
+              <SelectItem className={selectStyles.item} value="all">Wszystkie</SelectItem>
+              {branches.map((branch) => (
+                <SelectItem className={selectStyles.item} key={branch} value={branch}>
+                  {branch}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+        <Select
+          value={selectedYear?.toString() ?? yearsData?.currentYear?.toString()}
+          onValueChange={(value) => setSelectedYear(parseInt(value))}
+        >
+          <SelectTrigger className={`${selectStyles.trigger} w-32`}>
+            <SelectValue placeholder="Wybierz rok" />
+          </SelectTrigger>
+          <SelectContent className={`${selectStyles.content} w-32`}>
+            {yearsLoading ? (
+              <SelectItem value="loading">Ładowanie...</SelectItem>
+            ) : (
+              yearsData?.years?.map((year) => (
+                <SelectItem className={selectStyles.item} key={year} value={year.toString()}>
+                  {year}
+                </SelectItem>
+              ))
+            )}
+          </SelectContent>
+        </Select>
+      </div>
+    </div>
+  </div>
+
+  {/* Komunikat wyświetlany na urządzeniach mobilnych (poniżej md) */}
+  <div className="md:hidden text-center mb-4 text-gray-600">
+    <div>
+      Po więcej danych obróć ekran <RotateCcw className="inline-block h-4 w-4 text-gray-500" /><br />
+      lub użyj komputera <Monitor className="inline-block h-4 w-4 text-gray-500" />
+    </div>
+  </div>
+
+  {onlyBranch && authUserRole !== "ADMIN" && authUserRole !== "BOARD" ? (
+    // Jeśli użytkownik jest oddziałowy (ale nie ADMIN ani BOARD), renderujemy tylko kartę danego oddziału
+    <div className="space-y-6">
+      <CostsSummaryCard branch={onlyBranch} bgColor={getBgColorForBranch(onlyBranch)} selectedYear={selectedYear} />
+    </div>
+  ) : (
+    // Jeśli użytkownik nie jest oddziałowy lub ma rolę ADMIN/BOARD, renderujemy globalną kartę oraz karty dla wszystkich oddziałów
+    <>
+      {/* Globalna karta – bez oddziału; tło zielone */}
+      <CostsSummaryCard bgColor="bg-green-50" selectedYear={selectedYear} />
+
+      {/* Pozioma linia oddzielająca globalną kartę od kart oddziałowych */}
+      <hr className="border-t border-gray-300 my-4" />
+
+      {/* Karty dla oddziałów – w układzie siatki */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {branches
+          .filter(branch => !selectedBranchFilter || branch === selectedBranchFilter) // <-- DODAJ TEN FILTR
+          .map((branch, index) => {
+          let bgColor = index % 2 === 0 ? "bg-gray-50" : "bg-gray-100";
+          if (branch === "MG" || branch === "STH" || branch === "BHP") {
+            bgColor = getBgColorForBranch(branch);
+          }
+          return (
+            <div key={branch}>
+              {/* Dodatkowa linia przed kartą oddziału MG w widoku mobilnym */}
+              {branch === "MG" && <hr className="border-t border-gray-300 my-4 md:hidden" />}
+              <CostsSummaryCard branch={branch} bgColor={bgColor} selectedYear={selectedYear} />
+            </div>
+          );
+        })}
+      </div>
+    </>
+  )}
+</div>
   );
 };
 

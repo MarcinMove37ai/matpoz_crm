@@ -1494,85 +1494,86 @@ const ProfitsPHView: React.FC = () => {
   return (
     <div className="space-y-8">
       {/* Nagłówek z selektorami */}
-      <div className="mb-6">
-        {/* ZMIANA: Dodano nowy kontener flex, aby umieścić tytuł i select roku w jednej linii. */}
-        <div className="flex justify-between items-center mb-4">
-          {/* ZMIANA: Usunięto klasę 'mb-4' z H2. */}
-          <h2 className="text-xl font-semibold text-gray-800">Zyski PH</h2>
+        <div className="mb-6 sm:flex sm:items-center sm:justify-between">
 
-          {/* ZMIANA: Dodano select roku W WERSJI MOBILNEJ, widoczny tylko na małych ekranach ('sm:hidden'). */}
-          <div className="sm:hidden">
-            <Select
-              value={selectedYear?.toString() ?? yearsData?.currentYear?.toString()}
-              onValueChange={handleYearChange}
-            >
-              <SelectTrigger className={`${selectStyles.trigger} w-32`}>
-                <SelectValue className={selectStyles.placeholder} placeholder="Wybierz rok" />
-              </SelectTrigger>
-              <SelectContent className={`${selectStyles.content} w-32`}>
-                {yearsLoading ? (
-                  <SelectItem value="loading">Ładowanie...</SelectItem>
-                ) : (
-                  yearsData?.years?.map((year) => (
-                    <SelectItem
-                      className={selectStyles.item}
-                      key={year}
-                      value={year.toString()}
-                    >
-                      {year}
-                    </SelectItem>
-                  ))
-                )}
-              </SelectContent>
-            </Select>
+          {/* Kontener na tytuł i mobilny select roku - pozostaje bez zmian */}
+          <div className="flex justify-between items-center mb-4 sm:mb-0">
+            <h2 className="text-xl font-semibold text-gray-800">Zyski PH</h2>
+
+            {/* Mobilny select roku, ukryty na desktopie */}
+            <div className="sm:hidden">
+              <Select
+                value={selectedYear?.toString() ?? yearsData?.currentYear?.toString()}
+                onValue-change={handleYearChange}
+              >
+                <SelectTrigger className={`${selectStyles.trigger} w-32`}>
+                  <SelectValue className={selectStyles.placeholder} placeholder="Wybierz rok" />
+                </SelectTrigger>
+                <SelectContent className={`${selectStyles.content} w-32`}>
+                  {yearsLoading ? (
+                    <SelectItem value="loading">Ładowanie...</SelectItem>
+                  ) : (
+                    yearsData?.years?.map((year) => (
+                      <SelectItem
+                        className={selectStyles.item}
+                        key={year}
+                        value={year.toString()}
+                      >
+                        {year}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Kontener na filtry (select przedstawiciela i desktopowy select roku) */}
+          <div className="flex flex-col sm:flex-row sm:justify-end gap-3">
+
+            {/* Select przedstawiciela */}
+            {canUseRepresentativeFilter && (
+                <SearchableSelect
+                  className="w-full sm:w-48"
+                  placeholder="Wybierz przedstawiciela"
+                  value={selectedRepresentativeFilter || 'all'}
+                  onValueChange={handleRepresentativeFilterChange}
+                  items={[
+                    { value: 'all', label: 'Wszyscy' },
+                    ...sortedRepresentatives.map(rep => ({ value: rep, label: rep }))
+                  ]}
+                  expandUpward={false}
+                />
+            )}
+
+            {/* Desktopowy select roku, ukryty na mobile */}
+            <div className="hidden sm:block">
+              <Select
+                value={selectedYear?.toString() ?? yearsData?.currentYear?.toString()}
+                onValueChange={handleYearChange}
+              >
+                <SelectTrigger className={`${selectStyles.trigger} w-full sm:w-32`}>
+                  <SelectValue className={selectStyles.placeholder} placeholder="Wybierz rok" />
+                </SelectTrigger>
+                <SelectContent className={`${selectStyles.content} w-full sm:w-32`}>
+                  {yearsLoading ? (
+                    <SelectItem value="loading">Ładowanie lat...</SelectItem>
+                  ) : (
+                    yearsData?.years?.map((year) => (
+                      <SelectItem
+                        className={selectStyles.item}
+                        key={year}
+                        value={year.toString()}
+                      >
+                        {year}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
-
-        {/* ZMIANA: Zmieniono kontener na filtry. Teraz obsługuje on select przedstawiciela i desktopową wersję selecta roku. */}
-        <div className="flex flex-col sm:flex-row sm:justify-end gap-3">
-          {/* Select przedstawiciela - pozostaje bez zmian */}
-          {canUseRepresentativeFilter && (
-              <SearchableSelect
-                className="w-full sm:w-48"
-                placeholder="Wybierz przedstawiciela"
-                value={selectedRepresentativeFilter || 'all'}
-                onValueChange={handleRepresentativeFilterChange}
-                items={[
-                  { value: 'all', label: 'Wszyscy' }, // Dodajemy opcję "Wszyscy"
-                  ...sortedRepresentatives.map(rep => ({ value: rep, label: rep })) // Konwertujemy listę przedstawicieli
-                ]}
-                expandUpward={false}
-              />
-          )}
-
-          {/* ZMIANA: Oryginalny select roku teraz jest W WERSJI DESKTOPOWEJ, ukryty na małych ekranach ('hidden sm:block'). */}
-          <div className="hidden sm:block">
-            <Select
-              value={selectedYear?.toString() ?? yearsData?.currentYear?.toString()}
-              onValueChange={handleYearChange}
-            >
-              <SelectTrigger className={`${selectStyles.trigger} w-full sm:w-32`}>
-                <SelectValue className={selectStyles.placeholder} placeholder="Wybierz rok" />
-              </SelectTrigger>
-              <SelectContent className={`${selectStyles.content} w-full sm:w-32`}>
-                {yearsLoading ? (
-                  <SelectItem value="loading">Ładowanie lat...</SelectItem>
-                ) : (
-                  yearsData?.years?.map((year) => (
-                    <SelectItem
-                      className={selectStyles.item}
-                      key={year}
-                      value={year.toString()}
-                    >
-                      {year}
-                    </SelectItem>
-                  ))
-                )}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-      </div>
 
       {/* Komunikat wyświetlany na urządzeniach mobilnych i małych ekranach - zaktualizowany */}
       <div className="sm:hidden text-center mb-4 text-gray-600">
