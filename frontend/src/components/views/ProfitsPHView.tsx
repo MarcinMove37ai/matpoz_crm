@@ -1,5 +1,5 @@
 "use client";
-
+import SearchableSelect from "@/components/ui/SearchableSelect";
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import {
@@ -989,9 +989,10 @@ export const RepresentativeProfitsCard: React.FC<RepresentativeProfitsCardProps>
         </div>
 
         {/* Przycisk rozwijania historycznych danych - przeniesiony bezpośrednio po rocznych */}
+        {/* Przycisk rozwijania historycznych danych - przeniesiony bezpośrednio po rocznych */}
         <button
           onClick={() => setIsExpanded(!isExpanded)}
-          className="w-full flex items-center justify-center pt-1 pb-0.5 text-xs text-gray-500 hover:text-gray-700 mt-1 mb-1"
+          className="w-full hidden sm:flex items-center justify-center pt-1 pb-0.5 text-xs text-gray-500 hover:text-gray-700 mt-1 mb-1" // <-- ZMIANA TUTAJ
         >
           {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
         </button>
@@ -1504,31 +1505,17 @@ const ProfitsPHView: React.FC = () => {
         <div className="flex flex-col sm:flex-row sm:justify-end gap-3">
           {/* Select przedstawiciela - pozostaje bez zmian */}
           {canUseRepresentativeFilter && (
-            <Select
-              value={selectedRepresentativeFilter || 'all'}
-              onValueChange={handleRepresentativeFilterChange}
-            >
-              <SelectTrigger className={`${selectStyles.trigger} w-full sm:w-48`}>
-                <SelectValue className={selectStyles.placeholder} placeholder="Wybierz przedstawiciela" />
-              </SelectTrigger>
-              <SelectContent className={`${selectStyles.content} w-full sm:w-48`}>
-                <SelectItem
-                  className={selectStyles.item}
-                  value="all"
-                >
-                  Wszyscy
-                </SelectItem>
-                {sortedRepresentatives.map((rep) => (
-                  <SelectItem
-                    className={selectStyles.item}
-                    key={rep}
-                    value={rep}
-                  >
-                    {rep}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              <SearchableSelect
+                className="w-full sm:w-48"
+                placeholder="Wybierz przedstawiciela"
+                value={selectedRepresentativeFilter || 'all'}
+                onValueChange={handleRepresentativeFilterChange}
+                items={[
+                  { value: 'all', label: 'Wszyscy' }, // Dodajemy opcję "Wszyscy"
+                  ...sortedRepresentatives.map(rep => ({ value: rep, label: rep })) // Konwertujemy listę przedstawicieli
+                ]}
+                expandUpward={false}
+              />
           )}
 
           {/* ZMIANA: Oryginalny select roku teraz jest W WERSJI DESKTOPOWEJ, ukryty na małych ekranach ('hidden sm:block'). */}
