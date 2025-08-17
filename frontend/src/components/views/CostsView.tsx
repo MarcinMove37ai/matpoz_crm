@@ -659,9 +659,10 @@ const CostsView = () => {
       <Card className="w-full bg-blue-50">
         <CardContent className="p-6 pb-2">
           <div className="flex flex-col">
-            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-4 gap-4">
-              <h2 className="text-2xl font-semibold text-gray-800">Moduł Kosztów</h2>
-              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+            <div className="flex flex-col mb-4 gap-4">
+              {/* NOWY BLOK: Tytuł i selektor roku w jednej linii */}
+              <div className="flex flex-wrap justify-between items-center gap-4">
+                <h2 className="text-2xl font-semibold text-gray-800">Moduł Kosztów</h2>
                 <Select
                   value={selectedYear?.toString() ?? yearsData?.currentYear?.toString()}
                   onValueChange={(value) => setSelectedYear(parseInt(value))}
@@ -685,8 +686,10 @@ const CostsView = () => {
                     )}
                   </SelectContent>
                 </Select>
+              </div>
 
-                {/* Przyciski funkcyjne - ukryte dla REPRESENTATIVE */}
+              {/* Blok z przyciskami pozostaje bez zmian, ale w nowym kontenerze, aby wyrównać go do prawej */}
+              <div className="flex justify-start sm:justify-end">
                 {!isRepresentative && (
                   <div className="flex flex-wrap gap-2">
                     {canAdd && (
@@ -747,7 +750,6 @@ const CostsView = () => {
                     )}
                   </div>
                 )}
-
               </div>
             </div>
 

@@ -630,7 +630,7 @@ const renderHeader = () => {
 
   return (
     <Card className={`w-full ${bgColor}`}>
-      <CardContent className="p-0">
+      <CardContent className="p-3">
         {/* Nagłówek karty z nazwą oddziału i nagłówkami kolumn */}
         <div className="flex flex-col p-3 pb-2">
           {/* Nagłówki kolumn z nazwą oddziału w pierwszej kolumnie */}
@@ -657,8 +657,8 @@ const renderHeader = () => {
               <div className="text-xs text-blue-400">(wartość opłacona)</div>
             </div>
 
-            {/* Saldo oddziału */}
-            <div className="text-center">
+            {/* Saldo oddziału - UKRYTE NA MOBILE */}
+            <div className="hidden sm:block text-center">
               <span className="text-xs font-medium text-green-500">Saldo</span>
             </div>
           </div>
@@ -799,7 +799,7 @@ const renderHeader = () => {
         {/* Przycisk rozwijania historycznych danych - przeniesiony bezpośrednio po rocznych */}
         <button
           onClick={() => setIsExpanded(!isExpanded)}
-          className="w-full flex items-center justify-center pt-1 pb-0.5 text-xs text-gray-500 hover:text-gray-700 mt-1 mb-1"
+          className="w-full hidden sm:flex items-center justify-center pt-1 pb-0.5 text-xs text-gray-500 hover:text-gray-700 mt-1 mb-1"
         >
           {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
         </button>
@@ -989,11 +989,43 @@ const selectStyles = {
 
   return (
     <div className="space-y-8">
-      {/* Nagłówek z selektorami */}
-      <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-3">
-        <h2 className="text-xl font-semibold text-gray-800">Zyski Oddział</h2>
-        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-          {/* Selektor oddziałów widoczny dla Admina/Board */}
+      {/* Nagłówek z selektorami - struktura ujednolicona z innymi widokami */}
+      <div className="mb-6">
+        {/* Kontener dla tytułu i mobilnego selektora roku */}
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-semibold text-gray-800">Zyski Oddział</h2>
+
+          {/* WERSJA MOBILNA selektora roku (widoczny tylko na małych ekranach) */}
+          <div className="sm:hidden">
+            <Select
+              value={selectedYear?.toString() ?? yearsData?.currentYear?.toString()}
+              onValueChange={handleYearChange}
+            >
+              <SelectTrigger className={`${selectStyles.trigger} w-32`}>
+                <SelectValue className={selectStyles.placeholder} placeholder="Wybierz rok" />
+              </SelectTrigger>
+              <SelectContent className={`${selectStyles.content} w-32`}>
+                {yearsLoading ? (
+                  <SelectItem value="loading">Ładowanie lat...</SelectItem>
+                ) : (
+                  yearsData?.years?.map((year) => (
+                    <SelectItem
+                      className={selectStyles.item}
+                      key={year}
+                      value={year.toString()}
+                    >
+                      {year}
+                    </SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {/* Kontener na filtry (selektor oddziału i desktopowy selektor roku) */}
+        <div className="flex flex-col sm:flex-row sm:justify-end gap-3">
+          {/* Selektor oddziałów widoczony dla Admina/Board */}
           {(userRole === 'ADMIN' || userRole === 'BOARD') && (
             <Select
               value={selectedBranchFilter ?? 'all'}
@@ -1016,30 +1048,33 @@ const selectStyles = {
               </SelectContent>
             </Select>
           )}
-          {/* Selektor roku */}
-          <Select
-            value={selectedYear?.toString() ?? yearsData?.currentYear?.toString()}
-            onValueChange={handleYearChange}
-          >
-            <SelectTrigger className={`${selectStyles.trigger} w-full sm:w-32`}>
-              <SelectValue className={selectStyles.placeholder} placeholder="Wybierz rok" />
-            </SelectTrigger>
-            <SelectContent className={`${selectStyles.content} w-full sm:w-32`}>
-              {yearsLoading ? (
-                <SelectItem value="loading">Ładowanie lat...</SelectItem>
-              ) : (
-                yearsData?.years?.map((year) => (
-                  <SelectItem
-                    className={selectStyles.item}
-                    key={year}
-                    value={year.toString()}
-                  >
-                    {year}
-                  </SelectItem>
-                ))
-              )}
-            </SelectContent>
-          </Select>
+
+          {/* WERSJA DESKTOPOWA selektora roku (ukryty na małych ekranach) */}
+          <div className="hidden sm:block">
+            <Select
+              value={selectedYear?.toString() ?? yearsData?.currentYear?.toString()}
+              onValueChange={handleYearChange}
+            >
+              <SelectTrigger className={`${selectStyles.trigger} w-full sm:w-32`}>
+                <SelectValue className={selectStyles.placeholder} placeholder="Wybierz rok" />
+              </SelectTrigger>
+              <SelectContent className={`${selectStyles.content} w-full sm:w-32`}>
+                {yearsLoading ? (
+                  <SelectItem value="loading">Ładowanie lat...</SelectItem>
+                ) : (
+                  yearsData?.years?.map((year) => (
+                    <SelectItem
+                      className={selectStyles.item}
+                      key={year}
+                      value={year.toString()}
+                    >
+                      {year}
+                    </SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </div>
 

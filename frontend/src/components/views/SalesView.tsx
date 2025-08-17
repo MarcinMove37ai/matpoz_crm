@@ -896,10 +896,43 @@ const OverallAndBranchesSales: React.FC = () => {
 
   return (
     <div className="space-y-8">
-      {/* Nagłówek z tytułem i selektorami */}
-      <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-3">
-        <h2 className="text-xl font-semibold text-gray-800">Sprzedaż Firma</h2>
-        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+      {/* Nagłówek z selektorami - struktura ujednolicona z innymi widokami */}
+      <div className="mb-6">
+        {/* Kontener dla tytułu i mobilnego selektora roku */}
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-semibold text-gray-800">Sprzedaż Firma</h2>
+
+          {/* WERSJA MOBILNA selektora roku (widoczny tylko na małych ekranach) */}
+          <div className="sm:hidden">
+            <Select
+              value={selectedYear?.toString() || yearsData?.currentYear?.toString() || currentSystemYear.toString()}
+              onValueChange={(value) => setSelectedYear(parseInt(value))}
+              disabled={yearsLoading}
+            >
+              <SelectTrigger className={`${selectStyles.trigger} w-32`}>
+                <SelectValue className={selectStyles.placeholder} placeholder="Wybierz rok" />
+              </SelectTrigger>
+              <SelectContent className={`${selectStyles.content} w-32`}>
+                {/* Zawartość selektora lat (bez zmian) */}
+                {yearsLoading ? (
+                  <SelectItem value="loading">Ładowanie...</SelectItem>
+                ) : yearsData?.years && yearsData.years.length > 0 ? (
+                  yearsData.years.map((year) => (
+                    <SelectItem className={selectStyles.item} key={year} value={year.toString()}>{year}</SelectItem>
+                  ))
+                ) : (
+                  [currentSystemYear - 2, currentSystemYear - 1, currentSystemYear, currentSystemYear + 1, currentSystemYear + 2]
+                    .map((year) => (
+                      <SelectItem className={selectStyles.item} key={year} value={year.toString()}>{year}</SelectItem>
+                    ))
+                )}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {/* Kontener na filtry (selektor oddziału i desktopowy selektor roku) */}
+        <div className="flex flex-col sm:flex-row sm:justify-end gap-3">
           {/* Selektor oddziałów (tylko dla Admin/Board) */}
           {(authUserRole === 'ADMIN' || authUserRole === 'BOARD') && (
             <Select
@@ -912,59 +945,41 @@ const OverallAndBranchesSales: React.FC = () => {
               <SelectContent className={`${selectStyles.content} w-full sm:w-48`}>
                 <SelectItem className={selectStyles.item} value="all">Wszystkie oddziały</SelectItem>
                 {branches.map((branch) => (
-                  <SelectItem
-                    className={selectStyles.item}
-                    key={branch}
-                    value={branch}
-                  >
+                  <SelectItem className={selectStyles.item} key={branch} value={branch}>
                     {branchDisplayNames[branch] || branch}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           )}
-          {/* Selektor roku */}
-          <Select
-            value={selectedYear?.toString() || yearsData?.currentYear?.toString() || currentSystemYear.toString()}
-            onValueChange={(value) => setSelectedYear(parseInt(value))}
-            disabled={yearsLoading}
-          >
-            <SelectTrigger className={`${selectStyles.trigger} w-32`}>
-              <SelectValue className={selectStyles.placeholder} placeholder="Wybierz rok" />
-            </SelectTrigger>
-            <SelectContent className={`${selectStyles.content} w-32`}>
-              {yearsLoading ? (
-                <SelectItem value="loading">Ładowanie lat...</SelectItem>
-              ) : yearsData?.years && yearsData.years.length > 0 ? (
-                yearsData.years.map((year) => (
-                  <SelectItem
-                    className={selectStyles.item}
-                    key={year}
-                    value={year.toString()}
-                  >
-                    {year}
-                  </SelectItem>
-                ))
-              ) : (
-                // Fallback jeśli API nie zwróciło lat - generujemy 5 lat wokół bieżącego roku
-                [
-                  currentSystemYear - 2,
-                  currentSystemYear - 1,
-                  currentSystemYear,
-                  currentSystemYear + 1,
-                  currentSystemYear + 2
-                ].map((year) => (
-                  <SelectItem
-                    className={selectStyles.item}
-                    key={year}
-                    value={year.toString()}
-                  >
-                    {year}
-                  </SelectItem>
-                ))
-              )}
-            </SelectContent>
-          </Select>
+
+          {/* WERSJA DESKTOPOWA selektora roku (ukryty na małych ekranach) */}
+          <div className="hidden sm:block">
+            <Select
+              value={selectedYear?.toString() || yearsData?.currentYear?.toString() || currentSystemYear.toString()}
+              onValueChange={(value) => setSelectedYear(parseInt(value))}
+              disabled={yearsLoading}
+            >
+              <SelectTrigger className={`${selectStyles.trigger} w-full sm:w-32`}>
+                <SelectValue className={selectStyles.placeholder} placeholder="Wybierz rok" />
+              </SelectTrigger>
+              <SelectContent className={`${selectStyles.content} w-full sm:w-32`}>
+                {/* Zawartość selektora lat (bez zmian) */}
+                {yearsLoading ? (
+                  <SelectItem value="loading">Ładowanie lat...</SelectItem>
+                ) : yearsData?.years && yearsData.years.length > 0 ? (
+                  yearsData.years.map((year) => (
+                    <SelectItem className={selectStyles.item} key={year} value={year.toString()}>{year}</SelectItem>
+                  ))
+                ) : (
+                  [currentSystemYear - 2, currentSystemYear - 1, currentSystemYear, currentSystemYear + 1, currentSystemYear + 2]
+                  .map((year) => (
+                    <SelectItem className={selectStyles.item} key={year} value={year.toString()}>{year}</SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </div>
 

@@ -822,7 +822,7 @@ export const RepresentativeProfitsCard: React.FC<RepresentativeProfitsCardProps>
 
   return (
     <Card className={`w-full ${bgColor}`}>
-      <CardContent className="p-0">
+      <CardContent className="p-3">
         {/* Nagłówek karty z nazwą przedstawiciela i nagłówkami kolumn */}
         <div className="flex flex-col p-3 pb-2">
           {/* Nagłówki kolumn z nazwą przedstawiciela w pierwszej kolumnie */}

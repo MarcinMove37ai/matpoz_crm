@@ -508,6 +508,16 @@ export const CostsSummaryCard: React.FC<CostsSummaryCardProps> = ({ branch, bgCo
 // Komponent rodzicielski – globalna karta oraz karty dla oddziałów
 //
 const CostsSummaryView: React.FC = () => {
+
+  const [selectedBranchFilter, setSelectedBranchFilter] = useState<string | null>(null);
+
+  // ... (istniejące hooki)
+
+  // NOWY HANDLER:
+  const handleBranchFilterChange = (value: string) => {
+    setSelectedBranchFilter(value === 'all' ? null : value);
+  };
+
   // Lista oddziałów – kolejność ustalana jest statycznie
   const branches = ["Pcim", "Rzgów", "Malbork", "Lublin", "Łomża", "Myślibórz", "MG", "STH", "BHP"];
 
@@ -602,33 +612,102 @@ const CostsSummaryView: React.FC = () => {
         </div>
       </div>
 
-      {/* Selektor roku - dodajemy na górze komponentu */}
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-semibold text-gray-800">Podział Kosztów</h2>
-        <div>
-          <Select
-            value={selectedYear?.toString() ?? yearsData?.currentYear?.toString()}
-            onValueChange={(value) => setSelectedYear(parseInt(value))}
-          >
-            <SelectTrigger className={`${selectStyles.trigger} w-32`}>
-              <SelectValue className={selectStyles.placeholder} placeholder="Wybierz rok" />
-            </SelectTrigger>
-            <SelectContent className={`${selectStyles.content} w-32`}>
-              {yearsLoading ? (
-                <SelectItem value="loading">Ładowanie lat...</SelectItem>
-              ) : (
-                yearsData?.years?.map((year) => (
-                  <SelectItem
-                    className={selectStyles.item}
-                    key={year}
-                    value={year.toString()}
-                  >
-                    {year}
-                  </SelectItem>
-                ))
-              )}
-            </SelectContent>
-          </Select>
+      {/* Ujednolicony nagłówek z filtrami - z responsywnym układem */}
+      <div className="mb-6">
+        {/* ===== WERSJA MOBILNA (widoczna do breakpointu 'sm') ===== */}
+        <div className="sm:hidden">
+          {/* Wiersz 1: Tytuł i selektor roku */}
+          <div className="flex justify-between items-center">
+            <h2 className="text-xl font-semibold text-gray-800">Podział Kosztów</h2>
+            {/* Selektor roku jest tutaj, obok tytułu */}
+            <Select
+              value={selectedYear?.toString() ?? yearsData?.currentYear?.toString()}
+              onValueChange={(value) => setSelectedYear(parseInt(value))}
+            >
+              <SelectTrigger className={`${selectStyles.trigger} w-32`}>
+                <SelectValue placeholder="Wybierz rok" />
+              </SelectTrigger>
+              <SelectContent className={`${selectStyles.content} w-32`}>
+                {yearsLoading ? (
+                  <SelectItem value="loading">Ładowanie...</SelectItem>
+                ) : (
+                  yearsData?.years?.map((year) => (
+                    <SelectItem className={selectStyles.item} key={year} value={year.toString()}>
+                      {year}
+                    </SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Wiersz 2: Selektor oddziałów (jeśli dostępny) */}
+          {(authUserRole === 'ADMIN' || authUserRole === 'BOARD') && (
+            <div className="mt-3"> {/* Dodatkowy margines górny dla odstępu */}
+              <Select
+                value={selectedBranchFilter ?? 'all'}
+                onValueChange={handleBranchFilterChange}
+              >
+                <SelectTrigger className={`${selectStyles.trigger} w-full`}>
+                  <SelectValue placeholder="Filtruj oddział" />
+                </SelectTrigger>
+                <SelectContent className={`${selectStyles.content} w-full`}>
+                  <SelectItem className={selectStyles.item} value="all">Wszystkie oddziały</SelectItem>
+                  {branches.map((branch) => (
+                    <SelectItem className={selectStyles.item} key={branch} value={branch}>
+                      {branch}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+        </div>
+
+        {/* ===== WERSJA DESKTOP (widoczna od 'sm' wzwyż) ===== */}
+        <div className="hidden sm:flex sm:justify-between sm:items-center">
+          <h2 className="text-xl font-semibold text-gray-800">Podział Kosztów</h2>
+
+          {/* Kontener na oba filtry, ułożone obok siebie po prawej stronie */}
+          <div className="flex items-center gap-3">
+            {(authUserRole === 'ADMIN' || authUserRole === 'BOARD') && (
+              <Select
+                value={selectedBranchFilter ?? 'all'}
+                onValueChange={handleBranchFilterChange}
+              >
+                <SelectTrigger className={`${selectStyles.trigger} w-48`}>
+                  <SelectValue placeholder="Filtruj oddział" />
+                </SelectTrigger>
+                <SelectContent className={`${selectStyles.content} w-48`}>
+                  <SelectItem className={selectStyles.item} value="all">Wszystkie oddziały</SelectItem>
+                  {branches.map((branch) => (
+                    <SelectItem className={selectStyles.item} key={branch} value={branch}>
+                      {branch}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            <Select
+              value={selectedYear?.toString() ?? yearsData?.currentYear?.toString()}
+              onValueChange={(value) => setSelectedYear(parseInt(value))}
+            >
+              <SelectTrigger className={`${selectStyles.trigger} w-32`}>
+                <SelectValue placeholder="Wybierz rok" />
+              </SelectTrigger>
+              <SelectContent className={`${selectStyles.content} w-32`}>
+                {yearsLoading ? (
+                  <SelectItem value="loading">Ładowanie...</SelectItem>
+                ) : (
+                  yearsData?.years?.map((year) => (
+                    <SelectItem className={selectStyles.item} key={year} value={year.toString()}>
+                      {year}
+                    </SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </div>
 
@@ -648,7 +727,9 @@ const CostsSummaryView: React.FC = () => {
 
           {/* Karty dla oddziałów – w układzie siatki */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {branches.map((branch, index) => {
+            {branches
+              .filter(branch => !selectedBranchFilter || branch === selectedBranchFilter) // <-- DODAJ TEN FILTR
+              .map((branch, index) => {
               let bgColor = index % 2 === 0 ? "bg-gray-50" : "bg-gray-100";
               if (branch === "MG" || branch === "STH" || branch === "BHP") {
                 bgColor = getBgColorForBranch(branch);
