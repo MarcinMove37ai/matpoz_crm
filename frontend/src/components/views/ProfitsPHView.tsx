@@ -1578,8 +1578,8 @@ const ProfitsPHView: React.FC = () => {
       {/* Komunikat wyświetlany na urządzeniach mobilnych i małych ekranach - zaktualizowany */}
       <div className="sm:hidden text-center mb-4 text-gray-600">
         <div>
-          Pokazane tylko najważniejsze dane<br />
-          Po więcej danych obróć ekran <RotateCcw className="inline-block h-4 w-4 text-gray-500" /> lub użyj komputera <Monitor className="inline-block h-4 w-4 text-gray-500" />
+          Po więcej danych obróć ekran <RotateCcw className="inline-block h-4 w-4 text-gray-500" /><br />
+          lub użyj komputera <Monitor className="inline-block h-4 w-4 text-gray-500" />
         </div>
       </div>
 

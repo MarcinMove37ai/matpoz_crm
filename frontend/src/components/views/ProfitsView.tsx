@@ -1305,61 +1305,96 @@ const ProfitsView: React.FC = () => {
 
   return (
     <div className="space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-y-4 mb-6">
+        {/* === POCZĄTEK ZMIAN === */}
+        {/* === POCZĄTEK ZMIAN === */}
+        <div className="mb-6">
+            {/* --- Układ TYLKO dla mobile (ukryty na sm i większych) --- */}
+            <div className="sm:hidden">
+                <div className="flex items-center justify-between">
+                    <h2 className="text-xl font-semibold text-gray-800">Zyski Firma</h2>
+                    <Select
+                        value={selectedYear?.toString() ?? yearsData?.currentYear?.toString()}
+                        onValueChange={(value) => setSelectedYear(parseInt(value))}
+                    >
+                        <SelectTrigger className={`${selectStyles.trigger} w-32`}>
+                            <SelectValue className={selectStyles.placeholder} placeholder="Wybierz rok" />
+                        </SelectTrigger>
+                        <SelectContent className={`${selectStyles.content} w-32`}>
+                            {yearsLoading ? (
+                                <SelectItem value="loading">Ładowanie lat...</SelectItem>
+                            ) : (
+                                yearsData?.years?.map((year) => (
+                                    <SelectItem className={selectStyles.item} key={year} value={year.toString()}>
+                                        {year}
+                                    </SelectItem>
+                                ))
+                            )}
+                        </SelectContent>
+                    </Select>
+                </div>
 
-            {/* Nowy kontener grupujący tytuł i selektor roku, z responsywnymi klasami */}
-            <div className="flex w-full items-center justify-between sm:w-auto sm:justify-start sm:gap-4">
-                <h2 className="text-xl font-semibold text-gray-800">Zyski Firma</h2>
-
-                <Select
-                    value={selectedYear?.toString() ?? yearsData?.currentYear?.toString()}
-                    onValueChange={(value) => setSelectedYear(parseInt(value))}
-                >
-                    <SelectTrigger className={`${selectStyles.trigger} w-32`}>
-                        <SelectValue className={selectStyles.placeholder} placeholder="Wybierz rok" />
-                    </SelectTrigger>
-                    <SelectContent className={`${selectStyles.content} w-32`}>
-                        {yearsLoading ? (
-                            <SelectItem value="loading">Ładowanie lat...</SelectItem>
-                        ) : (
-                            yearsData?.years?.map((year) => (
-                                <SelectItem
-                                    className={selectStyles.item}
-                                    key={year}
-                                    value={year.toString()}
-                                >
-                                    {year}
-                                </SelectItem>
-                            ))
-                        )}
-                    </SelectContent>
-                </Select>
+                {(userRole === 'ADMIN' || userRole === 'BOARD') && (
+                    <div className="mt-4">
+                        <Select value={selectedBranchFilter ?? 'all'} onValueChange={handleBranchFilterChange}>
+                            <SelectTrigger className={`${selectStyles.trigger} w-full`}>
+                                <SelectValue placeholder="Filtruj oddział" />
+                            </SelectTrigger>
+                            <SelectContent className={`${selectStyles.content} w-full`}>
+                                <SelectItem className={selectStyles.item} value="all">Wszystkie</SelectItem>
+                                {branches.map((branch) => (
+                                    <SelectItem className={selectStyles.item} key={branch} value={branch}>
+                                        {branchDisplayNames[branch] || branch}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                )}
             </div>
 
-            {/* Selektor oddziału jako osobny element, zachowuje swoje responsywne klasy */}
-            {(userRole === 'ADMIN' || userRole === 'BOARD') && (
-                <Select
-                    value={selectedBranchFilter ?? 'all'}
-                    onValueChange={handleBranchFilterChange}
-                >
-                    <SelectTrigger className={`${selectStyles.trigger} w-full sm:w-48`}>
-                        <SelectValue placeholder="Filtruj oddział" />
-                    </SelectTrigger>
-                    <SelectContent className={`${selectStyles.content} w-full sm:w-48`}>
-                        <SelectItem className={selectStyles.item} value="all">Wszystkie</SelectItem>
-                        {branches.map((branch) => (
-                            <SelectItem
-                                className={selectStyles.item}
-                                key={branch}
-                                value={branch}
-                            >
-                                {branchDisplayNames[branch] || branch}
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-            )}
+            {/* --- Układ TYLKO dla desktop (ukryty na xs) --- */}
+            <div className="hidden sm:flex items-center justify-between">
+                <h2 className="text-xl font-semibold text-gray-800">Zyski Firma</h2>
+                <div className="flex items-center gap-4">
+                    {(userRole === 'ADMIN' || userRole === 'BOARD') && (
+                        <Select value={selectedBranchFilter ?? 'all'} onValueChange={handleBranchFilterChange}>
+                            <SelectTrigger className={`${selectStyles.trigger} w-48`}>
+                                <SelectValue placeholder="Filtruj oddział" />
+                            </SelectTrigger>
+                            <SelectContent className={`${selectStyles.content} w-48`}>
+                                <SelectItem className={selectStyles.item} value="all">Wszystkie</SelectItem>
+                                {branches.map((branch) => (
+                                    <SelectItem className={selectStyles.item} key={branch} value={branch}>
+                                        {branchDisplayNames[branch] || branch}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    )}
+                    <Select
+                        value={selectedYear?.toString() ?? yearsData?.currentYear?.toString()}
+                        onValueChange={(value) => setSelectedYear(parseInt(value))}
+                    >
+                        <SelectTrigger className={`${selectStyles.trigger} w-32`}>
+                            <SelectValue className={selectStyles.placeholder} placeholder="Wybierz rok" />
+                        </SelectTrigger>
+                        <SelectContent className={`${selectStyles.content} w-32`}>
+                            {yearsLoading ? (
+                                <SelectItem value="loading">Ładowanie lat...</SelectItem>
+                            ) : (
+                                yearsData?.years?.map((year) => (
+                                    <SelectItem className={selectStyles.item} key={year} value={year.toString()}>
+                                        {year}
+                                    </SelectItem>
+                                ))
+                            )}
+                        </SelectContent>
+                    </Select>
+                </div>
+            </div>
         </div>
+        {/* === KONIEC ZMIAN === */}
+        {/* === KONIEC ZMIAN === */}
 
       <div className="sm:hidden text-center mb-4 text-gray-600">
         <div>
