@@ -16,6 +16,7 @@ import {
 } from "../../components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Plus } from 'lucide-react';
 
 interface AddCostDialogProps {
@@ -63,6 +64,8 @@ const AddCostDialog: React.FC<AddCostDialogProps> = ({
   const [costTypes, setCostTypes] = useState<Array<{ id: string, kind: string }>>([]);
   const [representativesList, setRepresentativesList] = useState<Array<{ id: string, name: string }>>([]);
   const [selectedDepartment, setSelectedDepartment] = useState('');
+  const [isCommissionPayment, setIsCommissionPayment] = useState(false);
+  const [previousDescription, setPreviousDescription] = useState('');
   // Dodaj tę linię po deklaracji costTypes
   const normalizedBranch = React.useMemo(() => normalizeBranchName(userBranch || ''), [userBranch]);
 
@@ -108,6 +111,12 @@ const AddCostDialog: React.FC<AddCostDialogProps> = ({
     "Przedstawiciel"
   ];
 
+  // Ograniczona lista właścicieli kosztu dla wypłaty prowizji
+  const commissionCostOwners = [
+    "Oddział",
+    "Przedstawiciel"
+  ];
+
   const departments = [
     "Pcim",
     "Rzgów",
@@ -127,6 +136,58 @@ const AddCostDialog: React.FC<AddCostDialogProps> = ({
 
     // Dla ADMIN i BOARD nie odświeżamy listy przedstawicieli przy zmianie oddziału
     // Lista zawsze zawiera wszystkich przedstawicieli
+  };
+
+  // Obsługa zmiany checkboxa wypłaty prowizji
+  const handleCommissionPaymentChange = (checked: boolean) => {
+    setIsCommissionPayment(checked);
+
+    if (checked) {
+      // Zapisz poprzednią wartość opisu i ustaw nową
+      setPreviousDescription(formData.description);
+      setFormData(prev => ({
+        ...prev,
+        costType: 'Wypłata',
+        description: 'Wypłata prowizji'
+      }));
+      setErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors.costType;
+        delete newErrors.description;
+        // Dodaj błąd dla costOwner jeśli nie został wybrany
+        if (!formData.costOwner) {
+          newErrors.costOwner = 'Pole obowiązkowe';
+        }
+        return newErrors;
+      });
+
+      // Jeśli obecny właściciel kosztu nie jest dozwolony dla prowizji, wyczyść go
+      if (formData.costOwner && !commissionCostOwners.includes(formData.costOwner)) {
+        setFormData(prev => ({
+          ...prev,
+          costOwner: ''
+        }));
+        setErrors(prev => ({
+          ...prev,
+          costOwner: 'Pole obowiązkowe'
+        }));
+      }
+    } else {
+      // Przywróć poprzednią wartość opisu
+      setFormData(prev => ({
+        ...prev,
+        description: previousDescription
+      }));
+      setPreviousDescription('');
+      // Usuń błąd dla costOwner jeśli checkbox jest odznaczony
+      setErrors(prev => {
+        const newErrors = { ...prev };
+        if (formData.costOwner) {
+          delete newErrors.costOwner;
+        }
+        return newErrors;
+      });
+    }
   };
 
   // Separate the useEffects to avoid dependency issues
@@ -326,6 +387,22 @@ const AddCostDialog: React.FC<AddCostDialogProps> = ({
       });
     }
 
+    // Specjalna obsługa dla właściciela kosztu gdy checkbox wypłaty prowizji jest zaznaczony
+    if (field === 'costOwner' && isCommissionPayment) {
+      if (value) {
+        setErrors(prev => {
+          const newErrors = { ...prev };
+          delete newErrors.costOwner;
+          return newErrors;
+        });
+      } else {
+        setErrors(prev => ({
+          ...prev,
+          costOwner: 'Pole obowiązkowe'
+        }));
+      }
+    }
+
     if (field === 'representative' && formData.costOwner === 'Przedstawiciel') {
       if (value) {
         setErrors(prev => {
@@ -367,6 +444,8 @@ const AddCostDialog: React.FC<AddCostDialogProps> = ({
     });
     setErrors({});
     setNotification(null);
+    setIsCommissionPayment(false);
+    setPreviousDescription('');
   };
 
   const isRepresentativeFieldDisabled = () => {
@@ -375,6 +454,11 @@ const AddCostDialog: React.FC<AddCostDialogProps> = ({
 
   const shouldShowNoRepresentative = () => {
     return formData.costOwner !== 'Przedstawiciel';
+  };
+
+  // Określ które opcje właściciela kosztu wyświetlać
+  const getAvailableCostOwners = () => {
+    return isCommissionPayment ? commissionCostOwners : costOwners;
   };
 
   return (
@@ -505,6 +589,7 @@ const AddCostDialog: React.FC<AddCostDialogProps> = ({
                   value={formData.costType}
                   onValueChange={(value) => handleInputChange('costType', value)}
                   placeholder="Wybierz rodzaj kosztu"
+                  disabled={isCommissionPayment}
                   items={costTypes.map(type => ({
                     value: type.kind,
                     label: type.kind
@@ -522,6 +607,7 @@ const AddCostDialog: React.FC<AddCostDialogProps> = ({
                   onChange={(e) => handleInputChange('description', e.target.value)}
                   placeholder="Za co?"
                   className="bg-white text-gray-800"
+                  disabled={isCommissionPayment}
                   required
                 />
                 {errors.description && (
@@ -543,7 +629,7 @@ const AddCostDialog: React.FC<AddCostDialogProps> = ({
                   value={formData.costOwner}
                   onValueChange={(value) => handleInputChange('costOwner', value)}
                   placeholder="Właściciel kosztu"
-                  items={costOwners.map(owner => ({
+                  items={getAvailableCostOwners().map(owner => ({
                     value: owner,
                     label: owner
                   }))}
@@ -592,21 +678,39 @@ const AddCostDialog: React.FC<AddCostDialogProps> = ({
           </div>
 
           {/* Przyciski akcji */}
-          <div className="flex justify-end space-x-4 pt-4 border-t border-gray-200">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setOpen(false)}
-              className="bg-white text-gray-900"
-            >
-              Anuluj
-            </Button>
-            <Button
-              type="submit"
-              className="bg-blue-600 text-white hover:bg-blue-700"
-            >
-              Dodaj koszt
-            </Button>
+          <div className="flex justify-between items-center pt-4 border-t border-gray-200">
+            {/* Checkbox wypłaty prowizji - lewy dolny róg */}
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="commission-payment"
+                checked={isCommissionPayment}
+                onCheckedChange={handleCommissionPaymentChange}
+              />
+              <label
+                htmlFor="commission-payment"
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-gray-700"
+              >
+                Wypłata prowizji
+              </label>
+            </div>
+
+            {/* Przyciski - prawy dolny róg */}
+            <div className="flex space-x-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setOpen(false)}
+                className="bg-white text-gray-900"
+              >
+                Anuluj
+              </Button>
+              <Button
+                type="submit"
+                className="bg-blue-600 text-white hover:bg-blue-700"
+              >
+                Dodaj koszt
+              </Button>
+            </div>
           </div>
         </form>
       </DialogContent>

@@ -1200,10 +1200,14 @@ const CostsView = () => {
                     <>
                       {sortedCosts.map((cost, index) => (
                         <TableRow
-                          key={cost.cost_id}
-                          className={`hover:bg-gray-50 ${
-                            selectedCosts.includes(cost.cost_id) ? 'bg-blue-50' : ''
-                          }`}
+                            key={cost.cost_id}
+                            className={`hover:bg-gray-50 ${
+                              selectedCosts.includes(cost.cost_id)
+                                ? 'bg-blue-50'
+                                : cost.cost_kind === 'Wypłata'
+                                  ? 'bg-yellow-50'
+                                  : ''
+                            }`}
                         >
                           {!isRepresentative && (
                             <TableCell className="text-center">
