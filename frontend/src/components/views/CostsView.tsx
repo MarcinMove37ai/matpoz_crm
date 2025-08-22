@@ -985,6 +985,7 @@ const CostsView = () => {
                         onValueChange={(value) => setSelectedMonth(value === 'all' ? null : value)}
                         placeholder="Wybierz miesiąc"
                         items={monthOptions}
+                        expandUpward={false}
                         className={`w-full ${isFilterActive(selectedMonth) ? 'bg-green-50' : ''}`}
                     />
                     {selectedMonth && selectedMonth !== 'all' && (
@@ -1006,6 +1007,7 @@ const CostsView = () => {
                         placeholder="Wybierz oddział"
                         items={branchOptions}
                         disabled={isBranch || isStaff || isRepresentative}
+                        expandUpward={false}
                         className={`w-full ${isFilterActive(selectedBranch, isBranch || isStaff || isRepresentative) ? 'bg-green-50' : ''}`}
                     />
                     {selectedBranch && selectedBranch !== 'all' && !(isBranch || isStaff || isRepresentative) && (
@@ -1027,6 +1029,7 @@ const CostsView = () => {
                         onValueChange={(value) => setSelectedCostOwner(value === 'all' ? null : value)}
                         placeholder="Czyj koszt?"
                         items={costOwnerOptions}
+                        expandUpward={false}
                         className={`w-full ${isFilterActive(selectedCostOwner) ? 'bg-green-50' : ''}`}
                     />
                     {selectedCostOwner && selectedCostOwner !== 'all' && (
@@ -1049,6 +1052,7 @@ const CostsView = () => {
                         placeholder="Rodzaj kosztu"
                         items={costTypeOptions}
                         disabled={isRepresentative}
+                        expandUpward={false}
                         className={`w-full ${isFilterActive(selectedCostType, isRepresentative) ? 'bg-green-50' : ''}`}
                     />
                     {selectedCostType && selectedCostType !== 'all' && !isRepresentative && (
@@ -1070,6 +1074,7 @@ const CostsView = () => {
                         placeholder="Kto wpisał koszt?"
                         items={authorOptions}
                         disabled={isStaff || isRepresentative || isBasia}
+                        expandUpward={false}
                         className={`w-full ${isFilterActive(selectedAuthor, isStaff || isRepresentative || isBasia) ? 'bg-green-50' : ''}`}
                     />
                     {selectedAuthor && selectedAuthor !== 'all' && !(isStaff || isRepresentative || isBasia) && (
@@ -1091,6 +1096,7 @@ const CostsView = () => {
                         placeholder="Przedstawiciel"
                         items={representativeOptions}
                         disabled={isRepresentative}
+                        expandUpward={false}
                         className={`w-full ${isFilterActive(selectedPH, isRepresentative) ? 'bg-green-50' : ''}`}
                     />
                     {selectedPH && selectedPH !== 'all' && !isRepresentative && (
