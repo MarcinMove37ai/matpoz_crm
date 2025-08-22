@@ -650,7 +650,7 @@ const CostsView = () => {
 
   const handleEditCost = (costData: CostData & { cost_id: number }) => {
     fetchCosts();
-    console.log('Zaktualizowano koszt:', costData);
+    console.log('Zaktualizowano wszystkie koszt:', costData);
   };
 
   const handleDeleteCost = async (costIds: number[]) => {
