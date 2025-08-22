@@ -143,8 +143,11 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
     }
   };
 
+  // Sprawdź czy filtr jest aktywny (ma zielone tło)
+  const isActiveFilter = className?.includes('bg-green-50');
+
   return (
-    <div ref={containerRef} className={cn("relative w-full", className)}>
+    <div ref={containerRef} className="relative w-full">
       {/* Main button/trigger */}
       <Button
         ref={triggerRef}
@@ -153,13 +156,28 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
         onClick={handleToggle}
         disabled={disabled}
         className={cn(
-          "w-full justify-between h-11 px-4 py-2 bg-gradient-to-br from-white to-gray-50",
+          "w-full justify-between h-11 px-4 py-2",
+          // Warunkowo aplikuj tło - zielone dla aktywnych filtrów, gradient dla nieaktywnych
+          isActiveFilter
+            ? "bg-green-50"
+            : "bg-gradient-to-br from-white to-gray-50",
           "border-2 border-gray-200 hover:border-blue-300 transition-all duration-200",
-          "hover:shadow-md hover:bg-gradient-to-br hover:from-blue-50 hover:to-white",
-          "focus:border-blue-500 focus:ring-4 focus:ring-blue-100 focus:bg-white",
+          "hover:shadow-md",
+          // Warunkowo aplikuj hover tło
+          isActiveFilter
+            ? "hover:bg-green-100"
+            : "hover:bg-gradient-to-br hover:from-blue-50 hover:to-white",
+          "focus:border-blue-500 focus:ring-4 focus:ring-blue-100",
+          // Warunkowo aplikuj focus tło
+          isActiveFilter
+            ? "focus:bg-green-50"
+            : "focus:bg-white",
           "text-gray-700 font-medium rounded-lg",
           disabled && "bg-gray-100 opacity-60 cursor-not-allowed hover:border-gray-200 hover:shadow-none",
-          isOpen && "border-blue-500 ring-4 ring-blue-100 shadow-lg bg-white"
+          isOpen && "border-blue-500 ring-4 ring-blue-100 shadow-lg",
+          // Warunkowo aplikuj open tło
+          isOpen && (isActiveFilter ? "bg-green-50" : "bg-white"),
+          className && !isActiveFilter ? className : "" // Aplikuj className tylko jeśli nie jest to aktywny filtr
         )}
       >
         <span className={cn(
@@ -199,7 +217,7 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className={cn(
-                    "search-input-override", // <--- DODAJ TĘ LINIĘ
+                    "search-input-override",
                     "pl-10 h-10 text-sm border-2 border-transparent bg-white text-gray-900",
                     "focus:border-blue-400 focus:ring-2 focus:ring-blue-100",
                     "rounded-lg shadow-sm transition-all duration-200",
@@ -263,12 +281,10 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
             transform: scale(1) translateY(0);
           }
         }
-        /* 👇 DODAJ TEN FRAGMENT KODU 👇 */
-          .search-input-override:focus,
-          .search-input-override:focus-visible {
-            outline: none !important;
-          }
-          /* ------------------------------ */
+        .search-input-override:focus,
+        .search-input-override:focus-visible {
+          outline: none !important;
+        }
 
         .scrollbar-thin::-webkit-scrollbar {
           width: 6px;

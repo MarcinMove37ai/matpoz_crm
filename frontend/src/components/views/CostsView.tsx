@@ -1,6 +1,6 @@
 /**
  * @file src/components/views/CostsView.tsx
- * @description Widok główny modułu kosztów
+ * @description Widok główny modułu kosztów z SearchableSelect
  */
 
 "use client"
@@ -25,14 +25,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Pencil, Trash2, AlertCircle, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
+import { Plus, Pencil, Trash2, AlertCircle, ChevronUp, ChevronDown, ChevronsUpDown, X } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { useCurrentDate } from '@/hooks/useCurrentDate';
 import { useAuth } from '@/hooks/useAuth';
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { costsService } from '@/services/costs';
 import { CostData } from '@/types/costs';
+import SearchableSelect from '@/components/ui/SearchableSelect';
 
 const branchMapping: Record<string, string> = {
     "pcim": "Pcim",
@@ -42,8 +44,8 @@ const branchMapping: Record<string, string> = {
     "malbork": "Malbork",
     "łomża": "Łomża",
     "lomza": "Łomża",
-    "myślibórz": "Myślibórz",
-    "mysliborz": "Myślibórz",
+    "myśliborz": "Myśliborz",
+    "mysliborz": "Myśliborz",
     "mg": "MG",
     "sth": "STH",
     "bhp": "BHP"
@@ -124,7 +126,7 @@ interface Cost {
 const CostsView = () => {
   const { formatDate, loading: dateLoading, date } = useCurrentDate();
   const { data: yearsData, loading: yearsLoading } = useTransactionYears();
-  const { user, userRole, userBranch } = useAuth(); // NOWA METODA POBIERANIA DANYCH UŻYTKOWNIKA
+  const { user, userRole, userBranch } = useAuth();
 
   // Stan dla filtrów
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
@@ -134,6 +136,20 @@ const CostsView = () => {
   const [selectedAuthor, setSelectedAuthor] = useState<string | null>(null);
   const [selectedPH, setSelectedPH] = useState<string | null>(null);
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
+
+  // Stan dla wyszukiwania
+  const [searchContractor, setSearchContractor] = useState<string>('');
+  const [debouncedContractor, setDebouncedContractor] = useState<string>('');
+
+  const [searchAmount, setSearchAmount] = useState<string>('');
+  const [amountTolerance, setAmountTolerance] = useState<number>(1);
+  const [debouncedAmount, setDebouncedAmount] = useState<string>('');
+  const [debouncedTolerance, setDebouncedTolerance] = useState<number>(1);
+  const [isRangeSearch, setIsRangeSearch] = useState<boolean>(false);
+  const [minAmount, setMinAmount] = useState<string>('');
+  const [maxAmount, setMaxAmount] = useState<string>('');
+  const [debouncedMinAmount, setDebouncedMinAmount] = useState<string>('');
+  const [debouncedMaxAmount, setDebouncedMaxAmount] = useState<string>('');
 
   // Stan dla sortowania
   const [sortConfig, setSortConfig] = useState<SortConfig>({
@@ -165,20 +181,105 @@ const CostsView = () => {
     representatives: [] as string[]
   });
 
+  // Funkcje pomocnicze do sprawdzania aktywności filtrów
+  const isFilterActive = (value: string | null, excludeFromActiveCheck = false) => {
+    return !excludeFromActiveCheck && value && value !== 'all';
+  };
+
+  // Funkcja do sprawdzania aktywności pól wyszukiwania
+  const isSearchFieldActive = (value: string) => {
+    return value.trim() !== '';
+  };
+
+  // Jednolite style dla przycisków X
+  const clearButtonStyle = "absolute right-2 top-1/2 -translate-y-1/2 text-red-500 hover:text-red-700 transition-colors duration-200 z-10";
+  const clearButtonStyleForSelect = "absolute right-11 top-1/2 -translate-y-1/2 text-red-500 hover:text-red-700 transition-colors duration-200 z-10";
+
+  // Przygotowanie opcji dla SearchableSelect
+  const monthOptions = useMemo(() => [
+    { value: 'all', label: 'Wszystkie miesiące' },
+    ...monthNames.map((month, index) => ({
+      value: (index + 1).toString(),
+      label: month
+    }))
+  ], []);
+
+  const branchOptions = useMemo(() => [
+    { value: 'all', label: 'Wszystkie oddziały' },
+    ...initialFilterOptions.branches.map(branch => ({
+      value: branch,
+      label: branch
+    }))
+  ], [initialFilterOptions.branches]);
+
+  const costOwnerOptions = useMemo(() => [
+    { value: 'all', label: 'Wszystkie' },
+    ...initialFilterOptions.costOwners.map(owner => ({
+      value: owner,
+      label: owner
+    }))
+  ], [initialFilterOptions.costOwners]);
+
+  const costTypeOptions = useMemo(() => [
+    { value: 'all', label: 'Wszystkie rodzaje' },
+    ...initialFilterOptions.costTypes.map(type => ({
+      value: type,
+      label: type
+    }))
+  ], [initialFilterOptions.costTypes]);
+
+  const authorOptions = useMemo(() => [
+    { value: 'all', label: 'Wszyscy' },
+    ...initialFilterOptions.authors.map(author => ({
+      value: author,
+      label: author
+    }))
+  ], [initialFilterOptions.authors]);
+
+  const representativeOptions = useMemo(() => [
+    { value: 'all', label: 'Wszyscy' },
+    ...initialFilterOptions.representatives.map(rep => ({
+      value: rep,
+      label: rep
+    }))
+  ], [initialFilterOptions.representatives]);
+
+  // Logika debouncingu
+  useEffect(() => {
+      const handler = setTimeout(() => {
+      setDebouncedAmount(searchAmount);
+      setDebouncedTolerance(amountTolerance);
+    }, 500);
+    return () => clearTimeout(handler);
+  }, [searchAmount, amountTolerance]);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedContractor(searchContractor);
+    }, 500);
+    return () => clearTimeout(handler);
+  }, [searchContractor]);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedMinAmount(minAmount);
+      setDebouncedMaxAmount(maxAmount);
+    }, 500);
+    return () => clearTimeout(handler);
+  }, [minAmount, maxAmount]);
+
   // Funkcja do sortowania
   const handleSort = (column: SortColumn) => {
     setSortConfig(prevConfig => {
       if (prevConfig.column === column) {
-        // Jeśli kliknięto tę samą kolumnę, zmień kierunek
         if (prevConfig.direction === 'asc') {
           return { column, direction: 'desc' };
         } else if (prevConfig.direction === 'desc') {
-          return { column: null, direction: null }; // Usuń sortowanie
+          return { column: null, direction: null };
         } else {
           return { column, direction: 'asc' };
         }
       } else {
-        // Jeśli kliknięto nową kolumnę, ustaw sortowanie rosnące
         return { column, direction: 'asc' };
       }
     });
@@ -333,7 +434,6 @@ const CostsView = () => {
   // Funkcja do pobierania wszystkich możliwych opcji filtrów
   const fetchInitialFilterOptions = useCallback(async () => {
     try {
-      // Parametry zapytania tylko z ograniczeniami wynikającymi z uprawnień
       const baseParams: {
         year?: number;
         branch?: string;
@@ -341,28 +441,23 @@ const CostsView = () => {
         cost_ph?: string;
         limit: number;
       } = {
-        limit: 1000 // Zwiększamy limit, aby pobrać więcej danych do filtrów
+        limit: 1000
       };
 
       if (selectedYear) {
         baseParams.year = selectedYear;
       }
 
-      // Ograniczenia wynikające z roli użytkownika
       if (userRole === 'BRANCH' && userBranch) {
         const branchKey = userBranch.toLowerCase();
         const correctBranchName = branchMapping[branchKey] || userBranch;
-        // W funkcji fetchInitialFilterOptions użyj `baseParams`
         baseParams.branch = correctBranchName;
-        // W funkcji fetchCosts użyj `params`
-        // params.branch = correctBranchName;
       }
 
       if (userRole === 'STAFF' && user?.fullName) {
         baseParams.cost_author = user.fullName;
       }
 
-      // Ograniczenia dla przedstawiciela handlowego - używamy user.fullName zamiast userRepresentative
       if (userRole === 'REPRESENTATIVE' && user?.fullName) {
         baseParams.cost_ph = user.fullName;
       }
@@ -371,7 +466,6 @@ const CostsView = () => {
       const representatives = await fetchRepresentatives();
 
       if (initialData.costs.length > 0) {
-        // Wydobycie unikalnych wartości z początkowych danych
         const branches = [...new Set(initialData.costs.map((cost: Cost) => cost.cost_branch))];
         const costOwners = [...new Set(initialData.costs.map((cost: Cost) => cost.cost_own))];
         const costTypes = [...new Set(initialData.costs.map((cost: Cost) => cost.cost_kind))];
@@ -396,7 +490,6 @@ const CostsView = () => {
       setLoading(true);
       setError(null);
 
-      // Parametry zapytania
       const params: {
         year?: number;
         month?: number;
@@ -407,61 +500,74 @@ const CostsView = () => {
         cost_ph?: string;
         limit: number;
         offset: number;
+        contrahent_like?: string;
+        amount_gte?: number;
+        amount_lte?: number;
       } = {
         limit: pagination.limit,
-        offset: pagination.offset
+        offset: pagination.offset,
       };
 
       if (selectedYear) {
         params.year = selectedYear;
       }
-
       if (selectedMonth && selectedMonth !== 'all') {
         params.month = parseInt(selectedMonth);
       }
-
       if (selectedBranch && selectedBranch !== 'all') {
         params.branch = selectedBranch;
       }
-
       if (selectedCostOwner && selectedCostOwner !== 'all') {
         params.cost_own = selectedCostOwner;
       }
-
       if (selectedCostType && selectedCostType !== 'all') {
         params.cost_kind = selectedCostType;
       }
-
       if (selectedAuthor && selectedAuthor !== 'all') {
         params.cost_author = selectedAuthor;
       }
-
       if (selectedPH && selectedPH !== 'all') {
         params.cost_ph = selectedPH;
       }
-      // BASIA widzi wyłącznie koszty, których sama jest autorem, bez ograniczeń oddziału
-      if (userRole === 'BASIA' && user?.fullName) {
-        params.cost_author = user.fullName;
-        // Nie dodajemy ograniczenia na oddział
+
+      // Logika wyszukiwania dynamicznego
+      if (debouncedContractor) {
+        params.contrahent_like = debouncedContractor;
       }
 
-      // Dodatkowa logika filtrowania na podstawie roli użytkownika
-      // BRANCH widzi tylko koszt własnego oddziału
+      if (isRangeSearch) {
+        // Logika dla wyszukiwania w zakresie "od - do"
+        const min = parseFloat(debouncedMinAmount);
+        const max = parseFloat(debouncedMaxAmount);
+        if (!isNaN(min)) {
+          params.amount_gte = min;
+        }
+        if (!isNaN(max)) {
+          params.amount_lte = max;
+        }
+      } else {
+        // Logika dla wyszukiwania pojedynczej kwoty z tolerancją
+        if (debouncedAmount) {
+          const amount = parseFloat(debouncedAmount);
+          if (!isNaN(amount)) {
+            params.amount_gte = amount - debouncedTolerance;
+            params.amount_lte = amount + debouncedTolerance;
+          }
+        }
+      }
+
+      // Logika uprawnień
+      if (userRole === 'BASIA' && user?.fullName) {
+        params.cost_author = user.fullName;
+      }
       if (userRole === 'BRANCH' && userBranch) {
         const branchKey = userBranch.toLowerCase();
         const correctBranchName = branchMapping[branchKey] || userBranch;
-        // W funkcji fetchInitialFilterOptions użyj `baseParams`
         params.branch = correctBranchName;
-        // W funkcji fetchCosts użyj `params`
-        // params.branch = correctBranchName;
       }
-
-      // STAFF widzi wyłącznie koszty, których sam jest autorem
       if (userRole === 'STAFF' && user?.fullName) {
         params.cost_author = user.fullName;
       }
-
-      // REPRESENTATIVE widzi tylko koszty powiązane z nim - używamy user.fullName zamiast userRepresentative
       if (userRole === 'REPRESENTATIVE' && user?.fullName) {
         params.cost_ph = user.fullName;
       }
@@ -472,12 +578,10 @@ const CostsView = () => {
       setPagination({
         total: data.total,
         limit: data.limit,
-        offset: data.offset
+        offset: data.offset,
       });
 
-      // Po odświeżeniu danych resetuj wybrane koszty
       setSelectedCosts([]);
-
     } catch (error) {
       console.error('Błąd podczas pobierania kosztów:', error);
       setError('Wystąpił błąd podczas ładowania danych. Spróbuj ponownie później.');
@@ -496,17 +600,21 @@ const CostsView = () => {
     pagination.offset,
     userRole,
     userBranch,
-    user?.fullName
+    user?.fullName,
+    debouncedContractor,
+    debouncedAmount,
+    debouncedTolerance,
+    isRangeSearch,
+    debouncedMinAmount,
+    debouncedMaxAmount,
   ]);
 
-  // Pobranie pełnej listy opcji filtrów przy załadowaniu lub zmianie roku
   useEffect(() => {
     if (selectedYear || yearsData?.currentYear) {
       fetchInitialFilterOptions();
     }
   }, [fetchInitialFilterOptions, selectedYear, yearsData?.currentYear]);
 
-  // Pobieranie kosztów przy pierwszym załadowaniu i zmianie filtrów
   useEffect(() => {
     if (selectedYear || yearsData?.currentYear) {
       fetchCosts();
@@ -520,31 +628,31 @@ const CostsView = () => {
     selectedCostType,
     selectedAuthor,
     selectedPH,
-    yearsData?.currentYear
+    yearsData?.currentYear,
+    debouncedContractor,
+    debouncedAmount,
+    debouncedTolerance,
+    isRangeSearch,
+    debouncedMinAmount,
+    debouncedMaxAmount,
   ]);
 
-  // Ustawienie domyślnego roku po załadowaniu lat
   useEffect(() => {
     if (!selectedYear && yearsData?.currentYear) {
       setSelectedYear(yearsData.currentYear);
     }
   }, [selectedYear, yearsData]);
 
-  // Obsługa dodania nowego kosztu
   const handleAddCost = (costData: CostData) => {
-    // Po dodaniu kosztu, odświeżamy listę
     fetchCosts();
     console.log('Dodano nowy koszt:', costData);
   };
 
-  // Obsługa edycji kosztu
   const handleEditCost = (costData: CostData & { cost_id: number }) => {
-    // Po edycji kosztu, odświeżamy listę
     fetchCosts();
     console.log('Zaktualizowano koszt:', costData);
   };
 
-  // Obsługa usunięcia kosztu
   const handleDeleteCost = async (costIds: number[]) => {
     try {
       const confirmed = window.confirm(
@@ -554,12 +662,9 @@ const CostsView = () => {
       );
 
       if (confirmed) {
-        // Usuwanie wielu kosztów sekwencyjnie
         for (const costId of costIds) {
           await costsService.deleteCost(costId);
         }
-
-        // Po usunięciu kosztów, odświeżamy listę
         fetchCosts();
         setSelectedCosts([]);
       }
@@ -569,7 +674,6 @@ const CostsView = () => {
     }
   };
 
-  // Obsługa zaznaczania wszystkich kosztów
   const handleSelectAllCosts = (checked: boolean) => {
     if (checked) {
       setSelectedCosts(sortedCosts.map(cost => cost.cost_id));
@@ -578,7 +682,6 @@ const CostsView = () => {
     }
   };
 
-  // Obsługa zaznaczania pojedynczego kosztu
   const handleSelectCost = (costId: number, checked: boolean) => {
     if (checked) {
       setSelectedCosts(prev => [...prev, costId]);
@@ -587,7 +690,6 @@ const CostsView = () => {
     }
   };
 
-  // Obsługa otwierania dialogu edycji
   const handleOpenEditDialog = () => {
     if (selectedCosts.length === 1) {
       const costId = selectedCosts[0];
@@ -597,42 +699,38 @@ const CostsView = () => {
     }
   };
 
-  // Przygotowanie wartości dla strony
+  // Funkcje do resetowania filtrów
+  const handleResetMonth = () => setSelectedMonth(null);
+  const handleResetBranch = () => setSelectedBranch(null);
+  const handleResetCostOwner = () => setSelectedCostOwner(null);
+  const handleResetCostType = () => setSelectedCostType(null);
+  const handleResetAuthor = () => setSelectedAuthor(null);
+  const handleResetPH = () => setSelectedPH(null);
+
   const isAdmin = userRole === 'ADMIN' || userRole === 'BOARD';
   const isBranch = userRole === 'BRANCH';
   const isStaff = userRole === 'STAFF';
   const isBasia = userRole === 'BASIA';
   const isRepresentative = userRole === 'REPRESENTATIVE';
-
-  // Określanie uprawnień
   const canEdit = isAdmin || isBranch || isStaff || isBasia;
   const canAdd = isAdmin || isBranch || isStaff || isBasia;
   const canDelete = isAdmin || isBranch || isStaff || isBasia;
-
-  // Sprawdzanie czy wszystkie koszty są zaznaczone
   const allCostsSelected = sortedCosts.length > 0 && selectedCosts.length === sortedCosts.length && !isRepresentative;
-
-  // Sprawdzanie czy przycisk edycji powinien być aktywny
   const isEditButtonEnabled = selectedCosts.length === 1 && canEdit;
-
-  // Sprawdzanie czy przycisk usuwania powinien być aktywny
   const isDeleteButtonEnabled = selectedCosts.length > 0 && canDelete;
 
-  // Ustawienia domyślne dla filtrów w zależności od roli
   useEffect(() => {
     if ((isBranch || isStaff) && userBranch) {
       setSelectedBranch(userBranch);
     }
   }, [isBranch, isStaff, userBranch]);
 
-  // Blokowanie zmiany autora dla roli STAFF
   useEffect(() => {
     if (isStaff && user?.fullName) {
       setSelectedAuthor(user.fullName);
     }
   }, [isStaff, user?.fullName]);
 
-  // Blokowanie zmiany przedstawiciela dla roli REPRESENTATIVE - zmodyfikowane do użycia user.fullName
   useEffect(() => {
     if (isRepresentative && user?.fullName) {
       setSelectedPH(user.fullName);
@@ -660,235 +758,354 @@ const CostsView = () => {
         <CardContent className="p-6 pb-2">
           <div className="flex flex-col">
             <div className="flex flex-col mb-4 gap-4">
-              {/* NOWY BLOK: Tytuł i selektor roku w jednej linii */}
               <div className="flex flex-wrap justify-between items-center gap-4">
                 <h2 className="text-2xl font-semibold text-gray-800">Moduł Kosztów</h2>
-                <Select
-                  value={selectedYear?.toString() ?? yearsData?.currentYear?.toString()}
-                  onValueChange={(value) => setSelectedYear(parseInt(value))}
-                >
-                  <SelectTrigger className={`${selectStyles.trigger} w-32`}>
-                    <SelectValue className={selectStyles.placeholder} placeholder="Wybierz rok" />
-                  </SelectTrigger>
-                  <SelectContent className={`${selectStyles.content} w-32`}>
-                    {yearsLoading ? (
-                      <SelectItem value="loading">Ładowanie lat...</SelectItem>
-                    ) : (
-                      yearsData?.years?.map((year) => (
-                        <SelectItem
-                          className={selectStyles.item}
-                          key={year}
-                          value={year.toString()}
-                        >
-                          {year}
-                        </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
+                <div className="relative">
+                    <Select
+                        value={selectedYear?.toString() ?? ''}
+                        onValueChange={(value) => setSelectedYear(value ? parseInt(value) : null)}
+                    >
+                        <SelectTrigger className={`${selectStyles.trigger} w-32`}>
+                            <SelectValue className={selectStyles.placeholder} placeholder="Wybierz rok" />
+                        </SelectTrigger>
+                        <SelectContent className={`${selectStyles.content} w-32`}>
+                            {yearsLoading ? (
+                            <SelectItem value="loading">Ładowanie lat...</SelectItem>
+                            ) : (
+                            yearsData?.years?.map((year) => (
+                                <SelectItem
+                                className={selectStyles.item}
+                                key={year}
+                                value={year.toString()}
+                                >
+                                {year}
+                                </SelectItem>
+                            ))
+                            )}
+                        </SelectContent>
+                    </Select>
+                </div>
               </div>
 
-              {/* Blok z przyciskami pozostaje bez zmian, ale w nowym kontenerze, aby wyrównać go do prawej */}
-              <div className="flex justify-start sm:justify-end">
-                {!isRepresentative && (
-                  <div className="flex flex-wrap gap-2">
-                    {canAdd && (
-                      <AddCostDialog
-                        onAddCost={handleAddCost}
-                        selectedYear={selectedYear ?? yearsData?.currentYear}
-                        userRole={userRole}
-                        userBranch={userBranch}
+              <div className="flex flex-wrap justify-between items-center gap-4">
+                <div className="flex flex-wrap items-center gap-2 flex-grow">
+                  <div className="relative w-48">
+                    <Input
+                        type="text"
+                        placeholder="Kontrahent"
+                        value={searchContractor}
+                        onChange={(e) => setSearchContractor(e.target.value)}
+                        className={`h-11 w-full border-gray-200 border-2 rounded-lg text-gray-800 placeholder:text-gray-400 pr-8 transition-colors duration-200 ${
+                          isSearchFieldActive(searchContractor) ? 'bg-green-50' : 'bg-white'
+                        }`}
+                    />
+                    {searchContractor && (
+                        <button
+                            type="button"
+                            onClick={() => setSearchContractor('')}
+                            className={clearButtonStyle}
+                            aria-label="Wyczyść"
+                        >
+                            <X className="h-4 w-4" />
+                        </button>
+                    )}
+                </div>
+                  <div className="flex items-center gap-2">
+                    {!isRangeSearch ? (
+                      <div className="flex items-center gap-1">
+                        <div className="relative w-36">
+                            <Input
+                                type="text"
+                                placeholder="Kwota"
+                                value={searchAmount}
+                                onChange={(e) => setSearchAmount(e.target.value)}
+                                className={`h-11 w-full border-gray-200 border-2 rounded-lg text-gray-800 placeholder:text-gray-400 pr-8 transition-colors duration-200 ${
+                                  isSearchFieldActive(searchAmount) ? 'bg-green-50' : 'bg-white'
+                                }`}
+                            />
+                            {searchAmount && (
+                                <button
+                                    type="button"
+                                    onClick={() => setSearchAmount('')}
+                                    className={clearButtonStyle}
+                                    aria-label="Wyczyść"
+                                >
+                                    <X className="h-4 w-4" />
+                                </button>
+                            )}
+                        </div>
+                        <Select value={amountTolerance.toString()} onValueChange={v => setAmountTolerance(parseInt(v))} disabled={!searchAmount}>
+                          <SelectTrigger className={`${selectStyles.trigger} w-[100px] ${!searchAmount ? 'bg-gray-100 opacity-70' : ''}`}>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent className={selectStyles.content}>
+                            <SelectItem className={selectStyles.item} value="1">± 1 zł</SelectItem>
+                            <SelectItem className={selectStyles.item} value="10">± 10 zł</SelectItem>
+                            <SelectItem className={selectStyles.item} value="100">± 100 zł</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <div className="relative w-32">
+                            <Input
+                                type="text"
+                                placeholder="Kwota od"
+                                value={minAmount}
+                                onChange={(e) => setMinAmount(e.target.value)}
+                                className={`h-11 w-full border-gray-200 border-2 rounded-lg text-gray-800 placeholder:text-gray-400 pr-8 transition-colors duration-200 ${
+                                  isSearchFieldActive(minAmount) ? 'bg-green-50' : 'bg-white'
+                                }`}
+                            />
+                            {minAmount && (
+                                <button
+                                    type="button"
+                                    onClick={() => setMinAmount('')}
+                                    className={clearButtonStyle}
+                                    aria-label="Wyczyść"
+                                >
+                                    <X className="h-4 w-4" />
+                                </button>
+                            )}
+                        </div>
+                        <div className="relative w-32">
+                            <Input
+                                type="text"
+                                placeholder="Kwota do"
+                                value={maxAmount}
+                                onChange={(e) => setMaxAmount(e.target.value)}
+                                className={`h-11 w-full border-gray-200 border-2 rounded-lg text-gray-800 placeholder:text-gray-400 pr-8 transition-colors duration-200 ${
+                                  isSearchFieldActive(maxAmount) ? 'bg-green-50' : 'bg-white'
+                                }`}
+                            />
+                            {maxAmount && (
+                                <button
+                                    type="button"
+                                    onClick={() => setMaxAmount('')}
+                                    className={clearButtonStyle}
+                                    aria-label="Wyczyść"
+                                >
+                                    <X className="h-4 w-4" />
+                                </button>
+                            )}
+                        </div>
+                      </div>
+                    )}
+                    <div className="hidden items-center space-x-2 md:flex">
+                      <Checkbox
+                        id="range-search"
+                        checked={isRangeSearch}
+                        onCheckedChange={(checked) => {
+                          const isChecked = checked === true;
+                          setIsRangeSearch(isChecked);
+                          if (isChecked) {
+                            setSearchAmount('');
+                          } else {
+                            setMinAmount('');
+                            setMaxAmount('');
+                          }
+                        }}
                       />
-                    )}
-
-                    {/* Przycisk edycji */}
-                    {canEdit && (
-                      <Button
-                        onClick={handleOpenEditDialog}
-                        disabled={!isEditButtonEnabled}
-                        className={`flex items-center space-x-1 ${
-                          isEditButtonEnabled
-                            ? 'bg-amber-600 text-white hover:bg-amber-700'
-                            : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                        }`}
-                        title={
-                          !canEdit
-                            ? 'Nie masz uprawnień do edycji kosztów'
-                            : selectedCosts.length === 0
-                              ? 'Zaznacz koszt, aby go edytować'
-                              : selectedCosts.length > 1
-                                ? 'Możesz edytować tylko jeden koszt na raz'
-                                : 'Edytuj zaznaczony koszt'
-                        }
-                      >
-                        <Pencil className="h-5 w-5" />
-                        <span className="sm:inline">Edytuj</span>
-                      </Button>
-                    )}
-
-                    {/* Przycisk usuwania */}
-                    {canDelete && (
-                      <Button
-                        onClick={() => handleDeleteCost(selectedCosts)}
-                        disabled={!isDeleteButtonEnabled}
-                        className={`flex items-center space-x-1 ${
-                          isDeleteButtonEnabled
-                            ? 'bg-red-600 text-white hover:bg-red-700'
-                            : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                        }`}
-                        title={
-                          !canDelete
-                            ? 'Nie masz uprawnień do usuwania kosztów'
-                            : selectedCosts.length === 0
-                              ? 'Zaznacz koszty do usunięcia'
-                              : `Usuń zaznaczone koszty (${selectedCosts.length})`
-                        }
-                      >
-                        <Trash2 className="h-5 w-5" />
-                        <span className="sm:inline">Usuń</span>
-                      </Button>
-                    )}
+                      <label htmlFor="range-search" className="text-sm font-medium text-gray-700 cursor-pointer select-none">
+                        od - do
+                      </label>
+                    </div>
                   </div>
-                )}
+                </div>
+
+                <div className="flex justify-start sm:justify-end">
+                    {!isRepresentative && (
+                    <div className="flex flex-wrap gap-2">
+                        {canAdd && (
+                        <AddCostDialog
+                            onAddCost={handleAddCost}
+                            selectedYear={selectedYear ?? yearsData?.currentYear}
+                            userRole={userRole}
+                            userBranch={userBranch}
+                        />
+                        )}
+
+                        {canEdit && (
+                        <Button
+                            onClick={handleOpenEditDialog}
+                            disabled={!isEditButtonEnabled}
+                            className={`flex items-center space-x-1 ${
+                            isEditButtonEnabled
+                                ? 'bg-amber-600 text-white hover:bg-amber-700'
+                                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                            }`}
+                            title={
+                            !canEdit
+                                ? 'Nie masz uprawnień do edycji kosztów'
+                                : selectedCosts.length === 0
+                                ? 'Zaznacz koszt, aby go edytować'
+                                : selectedCosts.length > 1
+                                    ? 'Możesz edytować tylko jeden koszt na raz'
+                                    : 'Edytuj zaznaczony koszt'
+                            }
+                        >
+                            <Pencil className="h-5 w-5" />
+                            <span className="sm:inline">Edytuj</span>
+                        </Button>
+                        )}
+
+                        {canDelete && (
+                        <Button
+                            onClick={() => handleDeleteCost(selectedCosts)}
+                            disabled={!isDeleteButtonEnabled}
+                            className={`flex items-center space-x-1 ${
+                            isDeleteButtonEnabled
+                                ? 'bg-red-600 text-white hover:bg-red-700'
+                                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                            }`}
+                            title={
+                            !canDelete
+                                ? 'Nie masz uprawnień do usuwania kosztów'
+                                : selectedCosts.length === 0
+                                ? 'Zaznacz koszty do usunięcia'
+                                : `Usuń zaznaczone koszty (${selectedCosts.length})`
+                            }
+                        >
+                            <Trash2 className="h-5 w-5" />
+                            <span className="sm:inline">Usuń</span>
+                        </Button>
+                        )}
+                    </div>
+                    )}
+                </div>
               </div>
             </div>
 
             <div className="border-b border-gray-300 mb-4"></div>
 
-            {/* Filtry - niektóre zablokowane dla REPRESENTATIVE */}
             <div className="grid grid-cols-1 md:grid-cols-6 gap-4 mb-6">
-              <Select value={selectedMonth ?? undefined} onValueChange={setSelectedMonth}>
-                <SelectTrigger className={selectStyles.trigger}>
-                  <SelectValue className={selectStyles.placeholder} placeholder="Wybierz miesiąc" />
-                </SelectTrigger>
-                <SelectContent className={selectStyles.content}>
-                  <SelectItem className={selectStyles.item} value="all">Wszystkie miesiące</SelectItem>
-                  {monthNames.map((month, index) => (
-                    <SelectItem
-                      className={selectStyles.item}
-                      key={index}
-                      value={(index + 1).toString()}
-                    >
-                      {month}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                <div className="relative">
+                    <SearchableSelect
+                        value={selectedMonth ?? 'all'}
+                        onValueChange={(value) => setSelectedMonth(value === 'all' ? null : value)}
+                        placeholder="Wybierz miesiąc"
+                        items={monthOptions}
+                        className={`w-full ${isFilterActive(selectedMonth) ? 'bg-green-50' : ''}`}
+                    />
+                    {selectedMonth && selectedMonth !== 'all' && (
+                        <button
+                            type="button"
+                            onClick={handleResetMonth}
+                            className={clearButtonStyleForSelect}
+                            aria-label="Wyczyść"
+                        >
+                            <X className="h-4 w-4" />
+                        </button>
+                    )}
+                </div>
 
-              <Select
-                  value={selectedBranch ?? undefined}
-                  onValueChange={setSelectedBranch}
-                  disabled={isBranch || isStaff || isRepresentative} // Blokujemy dla REPRESENTATIVE
-              >
-                <SelectTrigger className={`${selectStyles.trigger} ${(isBranch || isStaff || isRepresentative) ? "bg-gray-100 opacity-70" : ""}`}>
-                  <SelectValue className={selectStyles.placeholder} placeholder="Wybierz oddział" />
-                </SelectTrigger>
-                <SelectContent className={selectStyles.content}>
-                  <SelectItem className={selectStyles.item} value="all">Wszystkie oddziały</SelectItem>
-                  {initialFilterOptions.branches.map((branch) => (
-                    <SelectItem
-                      className={selectStyles.item}
-                      key={branch}
-                      value={branch}
-                    >
-                      {branch}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                <div className="relative">
+                    <SearchableSelect
+                        value={selectedBranch ?? 'all'}
+                        onValueChange={(value) => setSelectedBranch(value === 'all' ? null : value)}
+                        placeholder="Wybierz oddział"
+                        items={branchOptions}
+                        disabled={isBranch || isStaff || isRepresentative}
+                        className={`w-full ${isFilterActive(selectedBranch, isBranch || isStaff || isRepresentative) ? 'bg-green-50' : ''}`}
+                    />
+                    {selectedBranch && selectedBranch !== 'all' && !(isBranch || isStaff || isRepresentative) && (
+                        <button
+                            type="button"
+                            onClick={handleResetBranch}
+                            className={clearButtonStyleForSelect}
+                            aria-label="Wyczyść"
+                        >
+                            <X className="h-4 w-4" />
+                        </button>
+                    )}
+                </div>
 
-              {/* Filtr "Czyj koszt?" - ukryty dla REPRESENTATIVE */}
               {!isRepresentative && (
-                <Select
-                  value={selectedCostOwner ?? undefined}
-                  onValueChange={setSelectedCostOwner}
-                >
-                  <SelectTrigger className={selectStyles.trigger}>
-                    <SelectValue className={selectStyles.placeholder} placeholder="Czyj koszt?" />
-                  </SelectTrigger>
-                  <SelectContent className={selectStyles.content}>
-                    <SelectItem className={selectStyles.item} value="all">Wszystkie</SelectItem>
-                    {initialFilterOptions.costOwners.map((owner) => (
-                      <SelectItem
-                        className={selectStyles.item}
-                        key={owner}
-                        value={owner}
-                      >
-                        {owner}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="relative">
+                    <SearchableSelect
+                        value={selectedCostOwner ?? 'all'}
+                        onValueChange={(value) => setSelectedCostOwner(value === 'all' ? null : value)}
+                        placeholder="Czyj koszt?"
+                        items={costOwnerOptions}
+                        className={`w-full ${isFilterActive(selectedCostOwner) ? 'bg-green-50' : ''}`}
+                    />
+                    {selectedCostOwner && selectedCostOwner !== 'all' && (
+                        <button
+                            type="button"
+                            onClick={handleResetCostOwner}
+                            className={clearButtonStyleForSelect}
+                            aria-label="Wyczyść"
+                        >
+                            <X className="h-4 w-4" />
+                        </button>
+                    )}
+                </div>
               )}
 
-              <Select
-                value={selectedCostType ?? undefined}
-                onValueChange={setSelectedCostType}
-                disabled={isRepresentative} // Blokujemy dla REPRESENTATIVE
-              >
-                <SelectTrigger className={`${selectStyles.trigger} ${isRepresentative ? "bg-gray-100 opacity-70" : ""}`}>
-                  <SelectValue className={selectStyles.placeholder} placeholder="Rodzaj kosztu" />
-                </SelectTrigger>
-                <SelectContent className={`${selectStyles.content} h-[200px] overflow-y-auto`}>
-                  <SelectItem className={selectStyles.item} value="all">Wszystkie rodzaje</SelectItem>
-                  {initialFilterOptions.costTypes.map((type) => (
-                    <SelectItem
-                      className={selectStyles.item}
-                      key={type}
-                      value={type}
-                    >
-                      {type}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                <div className="relative">
+                    <SearchableSelect
+                        value={selectedCostType ?? 'all'}
+                        onValueChange={(value) => setSelectedCostType(value === 'all' ? null : value)}
+                        placeholder="Rodzaj kosztu"
+                        items={costTypeOptions}
+                        disabled={isRepresentative}
+                        className={`w-full ${isFilterActive(selectedCostType, isRepresentative) ? 'bg-green-50' : ''}`}
+                    />
+                    {selectedCostType && selectedCostType !== 'all' && !isRepresentative && (
+                        <button
+                            type="button"
+                            onClick={handleResetCostType}
+                            className={clearButtonStyleForSelect}
+                            aria-label="Wyczyść"
+                        >
+                            <X className="h-4 w-4" />
+                        </button>
+                    )}
+                </div>
 
-              <Select
-                  value={selectedAuthor ?? undefined}
-                  onValueChange={setSelectedAuthor}
-                  disabled={isStaff || isRepresentative || isBasia} // Blokada dla STAFF i REPRESENTATIVE
-                >
-                  <SelectTrigger className={`${selectStyles.trigger} ${(isStaff || isRepresentative) ? "bg-gray-100 opacity-70" : ""}`}>
-                    <SelectValue className={selectStyles.placeholder} placeholder="Kto wpisał koszt?" />
-                  </SelectTrigger>
-                  <SelectContent className={`${selectStyles.content} h-[200px] overflow-y-auto`}>
-                    <SelectItem className={selectStyles.item} value="all">Wszyscy</SelectItem>
-                    {initialFilterOptions.authors.map((author) => (
-                      <SelectItem
-                        className={selectStyles.item}
-                        key={author}
-                        value={author}
-                      >
-                        {author}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-              </Select>
+                <div className="relative">
+                    <SearchableSelect
+                        value={selectedAuthor ?? 'all'}
+                        onValueChange={(value) => setSelectedAuthor(value === 'all' ? null : value)}
+                        placeholder="Kto wpisał koszt?"
+                        items={authorOptions}
+                        disabled={isStaff || isRepresentative || isBasia}
+                        className={`w-full ${isFilterActive(selectedAuthor, isStaff || isRepresentative || isBasia) ? 'bg-green-50' : ''}`}
+                    />
+                    {selectedAuthor && selectedAuthor !== 'all' && !(isStaff || isRepresentative || isBasia) && (
+                        <button
+                            type="button"
+                            onClick={handleResetAuthor}
+                            className={clearButtonStyleForSelect}
+                            aria-label="Wyczyść"
+                        >
+                            <X className="h-4 w-4" />
+                        </button>
+                    )}
+                </div>
 
-              <Select
-                value={selectedPH ?? undefined}
-                onValueChange={setSelectedPH}
-                disabled={isRepresentative} // Blokada dla REPRESENTATIVE
-              >
-                <SelectTrigger className={`${selectStyles.trigger} ${isRepresentative ? "bg-gray-100 opacity-70" : ""}`}>
-                  <SelectValue className={selectStyles.placeholder} placeholder="Przedstawiciel" />
-                </SelectTrigger>
-                <SelectContent className={`${selectStyles.content} h-[200px] overflow-y-auto`}>
-                  <SelectItem className={selectStyles.item} value="all">Wszyscy</SelectItem>
-                  {initialFilterOptions.representatives.map((ph) => (
-                    <SelectItem
-                      className={selectStyles.item}
-                      key={ph}
-                      value={ph}
-                    >
-                      {ph}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                <div className="relative">
+                    <SearchableSelect
+                        value={selectedPH ?? 'all'}
+                        onValueChange={(value) => setSelectedPH(value === 'all' ? null : value)}
+                        placeholder="Przedstawiciel"
+                        items={representativeOptions}
+                        disabled={isRepresentative}
+                        className={`w-full ${isFilterActive(selectedPH, isRepresentative) ? 'bg-green-50' : ''}`}
+                    />
+                    {selectedPH && selectedPH !== 'all' && !isRepresentative && (
+                        <button
+                            type="button"
+                            onClick={handleResetPH}
+                            className={clearButtonStyleForSelect}
+                            aria-label="Wyczyść"
+                        >
+                            <X className="h-4 w-4" />
+                        </button>
+                    )}
+                </div>
             </div>
 
-            {/* Błąd ładowania */}
             {error && (
               <Alert variant="destructive" className="mb-4">
                 <AlertCircle className="h-4 w-4" />
@@ -896,12 +1113,10 @@ const CostsView = () => {
               </Alert>
             )}
 
-            {/* Tabela */}
             <div className="bg-white rounded-md border border-gray-200 overflow-x-auto">
               <Table className="min-w-full table-fixed">
                 <TableHeader>
                   <TableRow className="bg-gray-50 hover:bg-gray-50">
-                    {/* Checkbox do zaznaczania wszystkich - ukryty dla REPRESENTATIVE */}
                     {!isRepresentative && (
                       <TableHead className="w-[40px] text-center">
                         <Checkbox
@@ -928,7 +1143,6 @@ const CostsView = () => {
                       Kwota
                     </SortableHeader>
 
-                    {/* Kolumna "Udział PH w koszcie" - tylko dla REPRESENTATIVE */}
                     {isRepresentative && (
                       <SortableHeader column="cost_ph_value" className="w-[120px] font-medium text-gray-800 text-center">
                         Udział PH w koszcie
@@ -942,7 +1156,6 @@ const CostsView = () => {
                       Za co?
                     </SortableHeader>
 
-                    {/* Kolumna "Czyj koszt?" - ukryta dla REPRESENTATIVE */}
                     {!isRepresentative && (
                       <SortableHeader column="cost_own" className="w-[100px] font-medium text-gray-800 text-center">
                         Czyj koszt?
@@ -962,7 +1175,6 @@ const CostsView = () => {
                 </TableHeader>
                 <TableBody>
                   {loading ? (
-                    // Stan ładowania
                     Array(5).fill(0).map((_, i) => (
                       <TableRow key={i}>
                         <TableCell colSpan={isRepresentative ? 12 : 13}>
@@ -971,7 +1183,6 @@ const CostsView = () => {
                       </TableRow>
                     ))
                   ) : sortedCosts.length === 0 ? (
-                    // Brak danych
                     <TableRow>
                       <TableCell colSpan={isRepresentative ? 11 : 13} className="text-center py-8 text-gray-500">
                         {isRepresentative
@@ -980,7 +1191,6 @@ const CostsView = () => {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    // Dane kosztów
                     <>
                       {sortedCosts.map((cost, index) => (
                         <TableRow
@@ -989,7 +1199,6 @@ const CostsView = () => {
                             selectedCosts.includes(cost.cost_id) ? 'bg-blue-50' : ''
                           }`}
                         >
-                          {/* Checkbox do zaznaczania pojedynczego kosztu - ukryty dla REPRESENTATIVE */}
                           {!isRepresentative && (
                             <TableCell className="text-center">
                               <Checkbox
@@ -1020,7 +1229,6 @@ const CostsView = () => {
                             {formatCurrency(cost.cost_value)}
                           </TableCell>
 
-                          {/* Kolumna "Udział PH w koszcie" - tylko dla REPRESENTATIVE */}
                           {isRepresentative && (
                             <TableCell className="font-medium text-blue-600 text-center">
                               {formatCurrency(cost.cost_ph_value)}
@@ -1034,7 +1242,6 @@ const CostsView = () => {
                             {cost.cost_4what}
                           </TableCell>
 
-                          {/* Kolumna "Czyj koszt?" - ukryta dla REPRESENTATIVE */}
                           {!isRepresentative && (
                             <TableCell className="text-gray-800 text-center">
                               {cost.cost_own}
@@ -1061,7 +1268,6 @@ const CostsView = () => {
                         </TableRow>
                       ))}
 
-                      {/* Wiersz podsumowania */}
                       {sortedCosts.length > 0 && (
                         <TableRow className="bg-gray-100 font-semibold border-t-2 border-gray-300">
                           {!isRepresentative && <TableCell className="text-center">-</TableCell>}
@@ -1100,7 +1306,6 @@ const CostsView = () => {
               </Table>
             </div>
 
-            {/* Paginacja */}
             {pagination.total > pagination.limit && (
               <div className="flex justify-between items-center mt-4">
                 <div className="text-sm text-gray-600">
@@ -1150,7 +1355,6 @@ const CostsView = () => {
         </CardContent>
       </Card>
 
-      {/* Dialog edycji kosztu - nie pokazujemy dla REPRESENTATIVE */}
       {!isRepresentative && (
         <EditCostDialog
           onEditCost={handleEditCost}

@@ -34,14 +34,17 @@ class CostCreate(BaseModel):
     class Config:
         from_attributes = True
 
+
 class CostKindBase(BaseModel):
     kind: str
 
     class Config:
         from_attributes = True
 
+
 class CostKindCreate(CostKindBase):
     pass
+
 
 class CostKindResponse(CostKindBase):
     id: int
@@ -52,10 +55,10 @@ class CostKindResponse(CostKindBase):
 # Endpoint do pobierania wypłat dla oddziałów
 @router.get("/costs/branch_payouts")
 async def get_branch_payouts(
-    db: Session = Depends(get_db),
-    year: Optional[int] = None,
-    month: Optional[int] = None,
-    branch: Optional[str] = None
+        db: Session = Depends(get_db),
+        year: Optional[int] = None,
+        month: Optional[int] = None,
+        branch: Optional[str] = None
 ):
     """
     Pobiera sumy wypłat dla oddziałów z możliwością filtrowania.
@@ -91,15 +94,16 @@ async def get_branch_payouts(
         logger.error(f"Błąd podczas pobierania wypłat dla oddziałów: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Błąd wewnętrzny serwera: {str(e)}")
 
+
 # Endpoint do pobierania wypłat dla przedstawicieli
 # Zaktualizowany endpoint do pobierania wypłat dla przedstawicieli
 @router.get("/costs/representative_payouts")
 async def get_representative_payouts(
-    db: Session = Depends(get_db),
-    year: Optional[int] = None,
-    month: Optional[int] = None,
-    rep: Optional[str] = None,
-    branch: Optional[str] = None
+        db: Session = Depends(get_db),
+        year: Optional[int] = None,
+        month: Optional[int] = None,
+        rep: Optional[str] = None,
+        branch: Optional[str] = None
 ):
     """
     Pobiera sumy wypłat dla przedstawicieli handlowych z możliwością filtrowania.
@@ -151,6 +155,8 @@ async def get_representative_payouts(
     except Exception as e:
         logger.error(f"Błąd podczas pobierania wypłat dla przedstawicieli: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Błąd wewnętrzny serwera: {str(e)}")
+
+
 @router.put("/costs/{cost_id}", response_model=CostCreate)
 async def update_cost(cost_id: int, cost: CostCreate, db: Session = Depends(get_db)):
     """
@@ -184,6 +190,7 @@ async def update_cost(cost_id: int, cost: CostCreate, db: Session = Depends(get_
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Błąd wewnętrzny serwera: {str(e)}")
 
+
 @router.get("/costs/authors")
 async def get_cost_authors(db: Session = Depends(get_db)):
     """
@@ -203,6 +210,7 @@ async def get_cost_authors(db: Session = Depends(get_db)):
     except Exception as e:
         logger.error(f"Błąd podczas pobierania autorów kosztów: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Błąd wewnętrzny serwera: {str(e)}")
+
 
 # Nowy endpoint do pobierania przedstawicieli handlowych
 @router.get("/costs/representatives")
@@ -227,6 +235,7 @@ async def get_cost_representatives(db: Session = Depends(get_db)):
         logger.error(f"Błąd podczas pobierania przedstawicieli: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Błąd wewnętrzny serwera: {str(e)}")
 
+
 # Cost Kinds endpoints
 @router.get("/cost_kinds", response_model=List[CostKindResponse])
 async def get_cost_kinds(db: Session = Depends(get_db)):
@@ -242,6 +251,7 @@ async def get_cost_kinds(db: Session = Depends(get_db)):
             status_code=500,
             detail="Wystąpił błąd podczas pobierania rodzajów kosztów"
         )
+
 
 @router.post("/cost_kinds", response_model=CostKindResponse)
 async def create_cost_kind(cost_kind: CostKindCreate, db: Session = Depends(get_db)):
@@ -277,6 +287,7 @@ async def create_cost_kind(cost_kind: CostKindCreate, db: Session = Depends(get_
             detail="Wystąpił błąd podczas tworzenia rodzaju kosztu"
         )
 
+
 @router.get("/cost_kinds/{cost_kind_id}", response_model=CostKindResponse)
 async def get_cost_kind(cost_kind_id: int, db: Session = Depends(get_db)):
     """
@@ -299,11 +310,12 @@ async def get_cost_kind(cost_kind_id: int, db: Session = Depends(get_db)):
             detail="Wystąpił błąd podczas pobierania rodzaju kosztu"
         )
 
+
 @router.put("/cost_kinds/{cost_kind_id}", response_model=CostKindResponse)
 async def update_cost_kind(
-    cost_kind_id: int,
-    cost_kind: CostKindCreate,
-    db: Session = Depends(get_db)
+        cost_kind_id: int,
+        cost_kind: CostKindCreate,
+        db: Session = Depends(get_db)
 ):
     """
     Aktualizuje istniejący rodzaj kosztu.
@@ -348,6 +360,7 @@ async def update_cost_kind(
             detail="Wystąpił błąd podczas aktualizacji rodzaju kosztu"
         )
 
+
 @router.delete("/cost_kinds/{cost_kind_id}")
 async def delete_cost_kind(cost_kind_id: int, db: Session = Depends(get_db)):
     """
@@ -383,6 +396,7 @@ async def delete_cost_kind(cost_kind_id: int, db: Session = Depends(get_db)):
             status_code=500,
             detail="Wystąpił błąd podczas usuwania rodzaju kosztu"
         )
+
 
 # Existing cost endpoints
 @router.post("/costs", response_model=CostCreate)
@@ -426,6 +440,7 @@ async def create_cost(cost: CostCreate, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Błąd wewnętrzny serwera: {str(e)}")
 
 
+# ZAKTUALIZOWANY ENDPOINT Z OBSŁUGĄ WYSZUKIWANIA
 @router.get("/costs")
 async def get_costs(
         db: Session = Depends(get_db),
@@ -435,17 +450,27 @@ async def get_costs(
         cost_own: Optional[str] = None,
         cost_kind: Optional[str] = None,
         cost_author: Optional[str] = None,
-        cost_ph: Optional[str] = None,  # Dodany parametr przedstawiciela
+        cost_ph: Optional[str] = None,
+        # --- DODANE PARAMETRY DLA WYSZUKIWANIA ---
+        contrahent_like: Optional[str] = None,  # Wyszukiwanie kontrahenta
+        amount_gte: Optional[float] = None,  # Minimalna kwota
+        amount_lte: Optional[float] = None,  # Maksymalna kwota
+        # ----------------------------------------
         limit: int = Query(100, ge=1, le=1000),
         offset: int = Query(0, ge=0)
 ):
     """
     Pobiera listę kosztów z możliwością filtrowania po różnych parametrach.
+
+    Nowe parametry:
+    - contrahent_like: Wyszukiwanie kontrahenta (LIKE '%text%')
+    - amount_gte: Minimalna kwota kosztu
+    - amount_lte: Maksymalna kwota kosztu
     """
     try:
         query = db.query(AllCosts)
 
-        # Zastosuj filtry
+        # Istniejące filtry
         if year is not None:
             query = query.filter(AllCosts.cost_year == year)
         if month is not None:
@@ -459,13 +484,33 @@ async def get_costs(
         if cost_author:
             query = query.filter(AllCosts.cost_author == cost_author)
         if cost_ph:
-            query = query.filter(AllCosts.cost_ph == cost_ph)  # Filtrowanie po przedstawicielu
+            query = query.filter(AllCosts.cost_ph == cost_ph)
+
+        # --- DODANE FILTRY WYSZUKIWANIA ---
+        # Wyszukiwanie kontrahenta (case-insensitive)
+        if contrahent_like:
+            query = query.filter(
+                AllCosts.cost_contrahent.ilike(f"%{contrahent_like}%")
+            )
+
+        # Filtrowanie po kwocie
+        if amount_gte is not None:
+            query = query.filter(AllCosts.cost_value >= amount_gte)
+
+        if amount_lte is not None:
+            query = query.filter(AllCosts.cost_value <= amount_lte)
+        # ------------------------------------
 
         # Pobierz całkowitą liczbę rekordów dla danego filtra
         total_count = query.count()
 
         # Zastosuj paginację
         costs = query.order_by(AllCosts.cost_id.desc()).offset(offset).limit(limit).all()
+
+        # Debug info (można usunąć w produkcji)
+        logger.info(
+            f"Filtry wyszukiwania: contrahent_like={contrahent_like}, amount_gte={amount_gte}, amount_lte={amount_lte}")
+        logger.info(f"Znaleziono {total_count} kosztów, zwracam {len(costs)} rekordów")
 
         return {
             "total": total_count,
@@ -558,13 +603,14 @@ async def get_costs_summary(
         logger.error(f"Błąd podczas pobierania podsumowania kosztów: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Błąd wewnętrzny serwera: {str(e)}")
 
+
 @router.get("/costs/representatives-summary")
 async def get_representatives_costs_summary(
-    db: Session = Depends(get_db),
-    year: Optional[int] = None,
-    month: Optional[int] = None,
-    branch: Optional[str] = None,
-    representative: Optional[str] = None
+        db: Session = Depends(get_db),
+        year: Optional[int] = None,
+        month: Optional[int] = None,
+        branch: Optional[str] = None,
+        representative: Optional[str] = None
 ):
     """
     Zwraca zagregowane koszty przedstawicieli z podziałem na rok/miesiąc/oddział.
@@ -656,6 +702,8 @@ async def get_representatives_costs_summary(
             status_code=500,
             detail=f"Błąd wewnętrzny serwera: {str(e)}"
         )
+
+
 @router.get("/costs/{cost_id}")
 async def get_cost_by_id(cost_id: int, db: Session = Depends(get_db)):
     """
@@ -688,7 +736,3 @@ async def delete_cost(cost_id: int, db: Session = Depends(get_db)):
         logger.error(f"Błąd podczas usuwania kosztu: {str(e)}")
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Błąd wewnętrzny serwera: {str(e)}")
-
-# NASTĘPNIE (bez zmian) pozostałe endpointy:
-# @router.get("/costs/{cost_id}")
-# @router.delete("/costs/{cost_id}")
