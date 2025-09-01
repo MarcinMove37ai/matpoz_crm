@@ -80,6 +80,13 @@ const EditCostDialog: React.FC<EditCostDialogProps> = ({
   const [previousDescription, setPreviousDescription] = useState('');
   const normalizedBranch = React.useMemo(() => normalizeBranchName(userBranch || ''), [userBranch]);
 
+  const getAvailableDepartments = () => {
+    if (userRole === 'ADMIN' || userRole === 'BASIA') {
+      return departments;
+    }
+    return departments.filter(dept => dept.value !== 'HQ');
+  };
+
   const [formData, setFormData] = useState({
     contractor: '',
     nip: '',
@@ -129,31 +136,60 @@ const EditCostDialog: React.FC<EditCostDialogProps> = ({
   ];
 
   const departments = [
-    "Pcim",
-    "Rzgów",
-    "Malbork",
-    "Lublin",
-    "Łomża",
-    "Myślibórz",
-    "MG",
-    "STH",
-    "BHP"
+    { value: "HQ", label: "Centrala" },
+    { value: "Pcim", label: "Pcim" },
+    { value: "Rzgów", label: "Rzgów" },
+    { value: "Malbork", label: "Malbork" },
+    { value: "Lublin", label: "Lublin" },
+    { value: "Łomża", label: "Łomża" },
+    { value: "Myślibórz", label: "Myślibórz" },
+    { value: "MG", label: "Interent" },
+    { value: "STH", label: "Serwis" },
+    { value: "BHP", label: "BHP" }
   ];
 
-  const handleDepartmentChange = (value: string) => {
+    const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({
       ...prev,
-      department: value
+      [field]: value
     }));
 
-    if (errors.department) {
+    if (errors[field]) {
       setErrors(prev => {
         const newErrors = { ...prev };
-        delete newErrors.department;
+        delete newErrors[field];
         return newErrors;
       });
     }
+
+    // Specjalna obsługa dla właściciela kosztu gdy checkbox wypłaty prowizji jest zaznaczony
+    if (field === 'costOwner' && isCommissionPayment) {
+      if (value) {
+        setErrors(prev => {
+          const newErrors = { ...prev };
+          delete newErrors.costOwner;
+          return newErrors;
+        });
+      } else {
+        setErrors(prev => ({
+          ...prev,
+          costOwner: 'Pole obowiązkowe'
+        }));
+      }
+    }
   };
+
+  const handleDepartmentChange = (value: string) => {
+    handleInputChange('department', value);
+
+    if (value === 'HQ') {
+      handleInputChange('costOwner', 'Centrala');
+      handleInputChange('representative', 'none');
+    } else if (value === 'STH' || value === 'MG' || value === 'BHP') {
+      handleInputChange('costOwner', 'Centrala');
+    }
+  };
+
 
   // Obsługa zmiany checkboxa wypłaty prowizji
   const handleCommissionPaymentChange = (checked: boolean) => {
@@ -210,6 +246,10 @@ const EditCostDialog: React.FC<EditCostDialogProps> = ({
   // Aktualizacja formularza po otwarciu dialogu i otrzymaniu danych kosztu
   useEffect(() => {
     if (isOpen && cost) {
+      // Resetowanie powiadomień i błędów przy każdym otwarciu modala
+      setNotification(null);
+      setErrors({});
+
       const isCommission = cost.cost_kind === 'Wypłata';
       setIsCommissionPayment(isCommission);
 
@@ -378,37 +418,6 @@ const EditCostDialog: React.FC<EditCostDialogProps> = ({
           type: 'error',
           message: error instanceof Error ? error.message : 'Wystąpił błąd podczas aktualizacji kosztu'
         });
-      }
-    }
-  };
-
-  const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
-
-    if (errors[field]) {
-      setErrors(prev => {
-        const newErrors = { ...prev };
-        delete newErrors[field];
-        return newErrors;
-      });
-    }
-
-    // Specjalna obsługa dla właściciela kosztu gdy checkbox wypłaty prowizji jest zaznaczony
-    if (field === 'costOwner' && isCommissionPayment) {
-      if (value) {
-        setErrors(prev => {
-          const newErrors = { ...prev };
-          delete newErrors.costOwner;
-          return newErrors;
-        });
-      } else {
-        setErrors(prev => ({
-          ...prev,
-          costOwner: 'Pole obowiązkowe'
-        }));
       }
     }
   };
@@ -586,6 +595,7 @@ const EditCostDialog: React.FC<EditCostDialogProps> = ({
                   value={formData.costOwner}
                   onValueChange={(value) => handleInputChange('costOwner', value)}
                   placeholder="Właściciel kosztu"
+                  disabled={formData.department === 'HQ'}
                   items={getAvailableCostOwners().map(owner => ({
                     value: owner,
                     label: owner
@@ -602,9 +612,9 @@ const EditCostDialog: React.FC<EditCostDialogProps> = ({
                   onValueChange={(value) => handleDepartmentChange(value)}
                   placeholder="Oddział"
                   disabled={userRole === 'BRANCH' || userRole === 'STAFF'}
-                  items={departments.map(dept => ({
-                    value: dept,
-                    label: dept
+                  items={getAvailableDepartments().map(dept => ({
+                    value: dept.value,
+                    label: dept.label
                   }))}
                 />
                 {errors.department && (
@@ -617,7 +627,7 @@ const EditCostDialog: React.FC<EditCostDialogProps> = ({
                   value={formData.representative}
                   onValueChange={(value) => handleInputChange('representative', value)}
                   placeholder="Przedstawiciel"
-                  disabled={isRepresentativeFieldDisabled()}
+                  disabled={isRepresentativeFieldDisabled() || formData.department === 'HQ'}
                   items={[
                     ...(shouldShowNoRepresentative() ? [{ value: 'none', label: 'Brak przedstawiciela' }] : []),
                     ...representativesList.map(rep => ({

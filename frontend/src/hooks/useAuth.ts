@@ -570,7 +570,7 @@ export const useAuth = () => {
   }, [storedState, checkAuthState, refreshUserData, isAuthenticated, user]);
 
   // Funkcja logowania
-  const handleSignIn = useCallback(async (username: string, password: string) => {
+  const handleSignIn = useCallback(async (username: string, password: string): Promise<{ success: boolean; role?: string } | boolean> => {
     if (!mountedRef.current) return false;
 
     setLoading(true);
@@ -612,9 +612,7 @@ export const useAuth = () => {
           return false;
         }
 
-        const defaultPage = (userGroup === 'ADMIN' || userGroup === 'BOARD') ? '/dashboard' : '/sales';
-        router.replace(defaultPage);
-        return true;
+        return { success: true, role: userGroup };
       }
 
       setError('Błąd logowania');

@@ -52,6 +52,19 @@ const normalizeBranchName = (branch: string): string => {
   return branchMap[branch.toUpperCase()] || branch;
 };
 
+const departments = [
+  { value: "HQ", label: "Centrala" },
+  { value: "Pcim", label: "Pcim" },
+  { value: "Rzgów", label: "Rzgów" },
+  { value: "Malbork", label: "Malbork" },
+  { value: "Lublin", label: "Lublin" },
+  { value: "Łomża", label: "Łomża" },
+  { value: "Myślibórz", label: "Myślibórz" },
+  { value: "MG", label: "Interent" },
+  { value: "STH", label: "Serwis" },
+  { value: "BHP", label: "BHP" }
+];
+
 const AddCostDialog: React.FC<AddCostDialogProps> = ({
   onAddCost,
   representatives: providedRepresentatives,
@@ -68,6 +81,13 @@ const AddCostDialog: React.FC<AddCostDialogProps> = ({
   const [previousDescription, setPreviousDescription] = useState('');
   // Dodaj tę linię po deklaracji costTypes
   const normalizedBranch = React.useMemo(() => normalizeBranchName(userBranch || ''), [userBranch]);
+
+  const getAvailableDepartments = () => {
+    if (userRole === 'ADMIN' || userRole === 'BASIA') {
+      return departments;
+    }
+    return departments.filter(dept => dept.value !== 'HQ');
+  };
 
   const [formData, setFormData] = useState({
     contractor: '',
@@ -117,23 +137,17 @@ const AddCostDialog: React.FC<AddCostDialogProps> = ({
     "Przedstawiciel"
   ];
 
-  const departments = [
-    "Pcim",
-    "Rzgów",
-    "Malbork",
-    "Lublin",
-    "Łomża",
-    "Myślibórz",
-    "MG",
-    "STH",
-    "BHP"
-  ];
-
   // Move the handleDepartmentChange definition here, outside of the useEffect
   const handleDepartmentChange = (value: string) => {
     setSelectedDepartment(value);
     handleInputChange('department', value);
 
+    if (value === 'HQ') {
+      handleInputChange('costOwner', 'Centrala');
+      handleInputChange('representative', 'none');
+    } else if (value === 'STH' || value === 'MG' || value === 'BHP') {
+      handleInputChange('costOwner', 'Centrala');
+    }
     // Dla ADMIN i BOARD nie odświeżamy listy przedstawicieli przy zmianie oddziału
     // Lista zawsze zawiera wszystkich przedstawicieli
   };
@@ -274,7 +288,7 @@ const AddCostDialog: React.FC<AddCostDialogProps> = ({
 
     if ((userRole === 'BRANCH' || userRole === 'STAFF') && normalizedBranch) {
       // Sprawdź, czy oddział istnieje na liście
-      const branchExists = departments.includes(normalizedBranch);
+      const branchExists = departments.some(dept => dept.value === normalizedBranch);
       console.log('Ustawianie oddziału na:', normalizedBranch, 'istnieje na liście:', branchExists);
 
       if (branchExists) {
@@ -293,7 +307,7 @@ const AddCostDialog: React.FC<AddCostDialogProps> = ({
         console.warn('Oddział nie znajduje się na liście dostępnych oddziałów:', normalizedBranch);
       }
     }
-  }, [userRole, userBranch, normalizedBranch, departments]);
+  }, [userRole, userBranch, normalizedBranch]);
 
   useEffect(() => {
       // Przy zamknięciu formularza, zresetuj go
@@ -629,6 +643,7 @@ const AddCostDialog: React.FC<AddCostDialogProps> = ({
                   value={formData.costOwner}
                   onValueChange={(value) => handleInputChange('costOwner', value)}
                   placeholder="Właściciel kosztu"
+                  disabled={formData.department === 'HQ'}
                   items={getAvailableCostOwners().map(owner => ({
                     value: owner,
                     label: owner
@@ -645,9 +660,9 @@ const AddCostDialog: React.FC<AddCostDialogProps> = ({
                     onValueChange={(value) => handleDepartmentChange(value)}
                     placeholder="Oddział"
                     disabled={userRole === 'BRANCH' || userRole === 'STAFF'}
-                    items={departments.map(dept => ({
-                      value: dept,
-                      label: dept
+                    items={getAvailableDepartments().map(dept => ({
+                      value: dept.value,
+                      label: dept.label
                     }))}
                   />
                   {errors.department && (
@@ -660,7 +675,7 @@ const AddCostDialog: React.FC<AddCostDialogProps> = ({
                   value={formData.representative}
                   onValueChange={(value) => handleInputChange('representative', value)}
                   placeholder="Przedstawiciel"
-                  disabled={isRepresentativeFieldDisabled()}
+                  disabled={isRepresentativeFieldDisabled() || formData.department === 'HQ'}
                   items={[
                     ...(shouldShowNoRepresentative() ? [{ value: 'none', label: 'Brak przedstawiciela' }] : []),
                     ...representativesList.map(rep => ({

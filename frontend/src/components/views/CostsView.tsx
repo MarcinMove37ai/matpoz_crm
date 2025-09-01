@@ -285,78 +285,99 @@ const CostsView = () => {
     });
   };
 
-  // Funkcja do sortowania danych
+
   const sortedCosts = useMemo(() => {
-    if (!sortConfig.column || !sortConfig.direction) {
-      return costs;
-    }
+      // Filtruj koszty HQ dla nie-adminów jako dodatkowe zabezpieczenie
+      const filteredCosts = costs.filter(cost => {
+          // Admin widzi wszystko
+          if (userRole === 'ADMIN') {
+            return true;
+          }
 
-    return [...costs].sort((a, b) => {
-      let aValue: any;
-      let bValue: any;
+          // Jeśli to nie jest koszt HQ, pokazuj
+          if (cost.cost_branch !== 'HQ') {
+            return true;
+          }
 
-      switch (sortConfig.column) {
-        case 'cost_contrahent':
-          aValue = a.cost_contrahent;
-          bValue = b.cost_contrahent;
-          break;
-        case 'cost_nip':
-          aValue = a.cost_nip;
-          bValue = b.cost_nip;
-          break;
-        case 'date':
-          aValue = new Date(a.cur_yr, a.cur_mo - 1, a.cur_day);
-          bValue = new Date(b.cur_yr, b.cur_mo - 1, b.cur_day);
-          break;
-        case 'cost_doc_no':
-          aValue = a.cost_doc_no;
-          bValue = b.cost_doc_no;
-          break;
-        case 'cost_value':
-          aValue = a.cost_value;
-          bValue = b.cost_value;
-          break;
-        case 'cost_ph_value':
-          aValue = a.cost_ph_value;
-          bValue = b.cost_ph_value;
-          break;
-        case 'cost_kind':
-          aValue = a.cost_kind;
-          bValue = b.cost_kind;
-          break;
-        case 'cost_4what':
-          aValue = a.cost_4what;
-          bValue = b.cost_4what;
-          break;
-        case 'cost_own':
-          aValue = a.cost_own;
-          bValue = b.cost_own;
-          break;
-        case 'cost_ph':
-          aValue = a.cost_ph || '';
-          bValue = b.cost_ph || '';
-          break;
-        case 'cost_author':
-          aValue = a.cost_author;
-          bValue = b.cost_author;
-          break;
-        case 'cost_branch':
-          aValue = a.cost_branch;
-          bValue = b.cost_branch;
-          break;
-        default:
-          return 0;
+          // Jeśli to koszt HQ i użytkownik to BASIA, pokazuj tylko jeśli ona go utworzyła
+          if (userRole === 'BASIA' && user?.fullName && cost.cost_author === user.fullName) {
+            return true;
+          }
+
+          // W pozostałych przypadkach ukrywaj koszty HQ
+          return false;
+      });
+
+      if (!sortConfig.column || !sortConfig.direction) {
+        return filteredCosts;
       }
 
-      if (aValue < bValue) {
-        return sortConfig.direction === 'asc' ? -1 : 1;
-      }
-      if (aValue > bValue) {
-        return sortConfig.direction === 'asc' ? 1 : -1;
-      }
-      return 0;
-    });
-  }, [costs, sortConfig]);
+      return [...filteredCosts].sort((a, b) => {
+        let aValue: any;
+        let bValue: any;
+
+        switch (sortConfig.column) {
+          case 'cost_contrahent':
+            aValue = a.cost_contrahent;
+            bValue = b.cost_contrahent;
+            break;
+          case 'cost_nip':
+            aValue = a.cost_nip;
+            bValue = b.cost_nip;
+            break;
+          case 'date':
+            aValue = new Date(a.cur_yr, a.cur_mo - 1, a.cur_day);
+            bValue = new Date(b.cur_yr, b.cur_mo - 1, b.cur_day);
+            break;
+          case 'cost_doc_no':
+            aValue = a.cost_doc_no;
+            bValue = b.cost_doc_no;
+            break;
+          case 'cost_value':
+            aValue = a.cost_value;
+            bValue = b.cost_value;
+            break;
+          case 'cost_ph_value':
+            aValue = a.cost_ph_value;
+            bValue = b.cost_ph_value;
+            break;
+          case 'cost_kind':
+            aValue = a.cost_kind;
+            bValue = b.cost_kind;
+            break;
+          case 'cost_4what':
+            aValue = a.cost_4what;
+            bValue = b.cost_4what;
+            break;
+          case 'cost_own':
+            aValue = a.cost_own;
+            bValue = b.cost_own;
+            break;
+          case 'cost_ph':
+            aValue = a.cost_ph || '';
+            bValue = b.cost_ph || '';
+            break;
+          case 'cost_author':
+            aValue = a.cost_author;
+            bValue = b.cost_author;
+            break;
+          case 'cost_branch':
+            aValue = a.cost_branch;
+            bValue = b.cost_branch;
+            break;
+          default:
+            return 0;
+        }
+
+        if (aValue < bValue) {
+          return sortConfig.direction === 'asc' ? -1 : 1;
+        }
+        if (aValue > bValue) {
+          return sortConfig.direction === 'asc' ? 1 : -1;
+        }
+        return 0;
+      });
+  }, [costs, sortConfig, userRole]);
 
   // Komponent ikony sortowania
   const SortIcon = ({ column }: { column: SortColumn }) => {
@@ -503,6 +524,7 @@ const CostsView = () => {
         contrahent_like?: string;
         amount_gte?: number;
         amount_lte?: number;
+        exclude_branch?: string;
       } = {
         limit: pagination.limit,
         offset: pagination.offset,
@@ -570,6 +592,13 @@ const CostsView = () => {
       }
       if (userRole === 'REPRESENTATIVE' && user?.fullName) {
         params.cost_ph = user.fullName;
+      }
+
+      // Dla nie-adminów (oprócz BASIA) wyklucz koszty z oddziału HQ (Centrala)
+      // BASIA będzie miała dodatkowe filtrowanie po stronie klienta
+      if (userRole !== 'ADMIN' && userRole !== 'BASIA') {
+        // Dodaj parametr wykluczający oddział HQ
+        params.exclude_branch = 'HQ';
       }
 
       const data = await costsService.getCosts(params);

@@ -12,21 +12,28 @@ export default function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  useEffect(() => {
-    const redirect = searchParams.get('redirect') || '/dashboard';
-
-    if (isAuthenticated) {
-      console.log('Użytkownik zalogowany, przekierowanie na:', redirect);
-      router.replace(redirect);
-    }
-  }, [isAuthenticated, router, searchParams]);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const success = await signIn(username, password);
-    if (success) {
-      const redirect = searchParams.get('redirect') || '/dashboard';
-      router.replace(redirect);
+    // 1. Przechwytujemy wynik z funkcji signIn
+    const result = await signIn(username, password);
+
+    // 2. Sprawdzamy, czy logowanie się powiodło i czy mamy obiekt z rolą
+    if (result && typeof result === 'object' && result.success) {
+      const redirectParam = searchParams.get('redirect');
+
+      // Jeśli w URL jest parametr 'redirect', ma on priorytet
+      if (redirectParam) {
+        router.replace(redirectParam);
+      } else {
+        // 3. Logika przekierowania na podstawie roli
+        let defaultPage = '/costs'; // Domyślna strona dla ról innych niż admin i board
+        if (result.role === 'ADMIN') {
+          defaultPage = '/company';
+        } else if (result.role === 'BOARD') {
+          defaultPage = '/dashboard';
+        }
+        router.replace(defaultPage);
+      }
     }
   };
 

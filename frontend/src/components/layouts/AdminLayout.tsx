@@ -5,7 +5,7 @@ import React, { useState, ReactNode, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import type { LucideIcon } from 'lucide-react';
-import { BarChart3, ClipboardList, PiggyBank, TrendingUp, Map, Settings, Menu, X, Power, UserSearch, BarChart4, Flame, Ship, ChartNoAxesCombined, ChartPie, ChartBarStacked } from 'lucide-react';
+import { BarChart3, ClipboardList, PiggyBank, TrendingUp, Map, Settings, Menu, X, Power, UserSearch, BarChart4, Flame, Ship, ChartNoAxesCombined, ChartPie, ChartBarStacked, Building } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useCurrentDate } from '@/hooks/useCurrentDate';
 import Cookies from 'js-cookie';
@@ -30,6 +30,12 @@ interface MenuItem {
 }
 
 const menuItems: MenuItem[] = [
+  {
+    IconComponent: Building,
+    label: 'Firma',
+    path: '/company',
+    roles: ['ADMIN']
+  },
   {
     IconComponent: ChartNoAxesCombined,
     label: 'Strona główna',
