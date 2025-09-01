@@ -51,6 +51,12 @@ const branchMapping: Record<string, string> = {
     "bhp": "BHP"
 };
 
+const getBranchDisplayName = (branch: string): string => {
+  if (branch === 'HQ') return 'Centrala';
+  if (branch === 'STH') return 'Serwis';
+  return branch;
+};
+
 // Stałe dla filtrów
 const monthNames = [
   "Styczeń", "Luty", "Marzec", "Kwiecień", "Maj", "Czerwiec",
@@ -208,7 +214,7 @@ const CostsView = () => {
     { value: 'all', label: 'Wszystkie oddziały' },
     ...initialFilterOptions.branches.map(branch => ({
       value: branch,
-      label: branch
+      label: getBranchDisplayName(branch)
     }))
   ], [initialFilterOptions.branches]);
 
@@ -1294,15 +1300,15 @@ const CostsView = () => {
                             {cost.cost_author}
                           </TableCell>
                           <TableCell className="text-center">
-                            <span className={`inline-flex justify-center items-center px-2 py-1 rounded-full text-xs font-medium
-                              ${cost.cost_branch === 'MG' ? 'bg-red-100 text-red-800' :
-                                cost.cost_branch === 'STH' ? 'bg-purple-100 text-purple-800' :
-                                cost.cost_branch === 'BHP' ? 'bg-yellow-100 text-yellow-800' :
-                                cost.cost_branch === 'Pcim' ? 'bg-green-100 text-green-800' :
-                                cost.cost_branch === 'Rzgów' ? 'bg-blue-100 text-blue-800' :
-                                'bg-blue-100 text-blue-800'}`}>
-                              {cost.cost_branch}
-                            </span>
+                              <span className={`inline-flex justify-center items-center px-2 py-1 rounded-full text-xs font-medium
+                                ${cost.cost_branch === 'MG' ? 'bg-red-100 text-red-800' :
+                                  cost.cost_branch === 'STH' ? 'bg-purple-100 text-purple-800' :
+                                  cost.cost_branch === 'BHP' ? 'bg-yellow-100 text-yellow-800' :
+                                  cost.cost_branch === 'Pcim' ? 'bg-green-100 text-green-800' :
+                                  cost.cost_branch === 'Rzgów' ? 'bg-blue-100 text-blue-800' :
+                                  'bg-blue-100 text-blue-800'}`}>
+                                {getBranchDisplayName(cost.cost_branch)} {/* Zastosuj funkcję mapującą */}
+                              </span>
                           </TableCell>
                         </TableRow>
                       ))}
