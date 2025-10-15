@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Pencil, Trash2, AlertCircle, ChevronUp, ChevronDown, ChevronsUpDown, X } from 'lucide-react';
+import { Plus, Pencil, Trash2, AlertCircle, ChevronUp, ChevronDown, ChevronsUpDown, X, Copy } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { useCurrentDate } from '@/hooks/useCurrentDate';
 import { useAuth } from '@/hooks/useAuth';
@@ -44,8 +44,8 @@ const branchMapping: Record<string, string> = {
     "malbork": "Malbork",
     "łomża": "Łomża",
     "lomza": "Łomża",
-    "myśliborz": "Myśliborz",
-    "mysliborz": "Myśliborz",
+    "myśliborz": "Myślibórz",
+    "mysliborz": "Myślibórz",
     "mg": "MG",
     "sth": "STH",
     "bhp": "BHP"
@@ -130,6 +130,11 @@ interface Cost {
 }
 
 const CostsView = () => {
+  // Stany dla ścieżki "Powiel"
+  const [isDuplicateDialogOpen, setIsDuplicateDialogOpen] = useState(false);
+  const [costToDuplicate, setCostToDuplicate] = useState<Cost | null>(null);
+  const [scrollPosition, setScrollPosition] = useState<number | null>(null);
+
   const { formatDate, loading: dateLoading, date } = useCurrentDate();
   const { data: yearsData, loading: yearsLoading } = useTransactionYears();
   const { user, userRole, userBranch } = useAuth();
@@ -639,10 +644,27 @@ const CostsView = () => {
     debouncedContractor,
     debouncedAmount,
     debouncedTolerance,
-    isRangeSearch,
+isRangeSearch,
     debouncedMinAmount,
     debouncedMaxAmount,
   ]);
+
+  // Handler dla przycisku "Powiel"
+  const handleDuplicateCost = (cost: Cost) => {
+    setScrollPosition(window.scrollY);
+    setCostToDuplicate(cost);
+    setIsDuplicateDialogOpen(true);
+  };
+
+  // useEffect do przywracania scrolla TYLKO dla ścieżki "Powiel"
+  useEffect(() => {
+    if (!isDuplicateDialogOpen && scrollPosition !== null) {
+      setTimeout(() => {
+        window.scrollTo(0, scrollPosition);
+        setScrollPosition(null);
+      }, 0);
+    }
+  }, [isDuplicateDialogOpen, scrollPosition]);
 
   useEffect(() => {
     if (selectedYear || yearsData?.currentYear) {
@@ -952,12 +974,12 @@ const CostsView = () => {
                     {!isRepresentative && (
                     <div className="flex flex-wrap gap-2">
                         {canAdd && (
-                        <AddCostDialog
+                          <AddCostDialog
                             onAddCost={handleAddCost}
                             selectedYear={selectedYear ?? yearsData?.currentYear}
                             userRole={userRole}
                             userBranch={userBranch}
-                        />
+                          />
                         )}
 
                         {canEdit && (
@@ -1212,20 +1234,24 @@ const CostsView = () => {
                     <SortableHeader column="cost_branch" className="w-[80px] font-medium text-gray-800 text-center">
                       Oddział
                     </SortableHeader>
+                    {/* Dodatkowa komórka na przycisk Powiel */}
+                    {canAdd && !isRepresentative && (
+                        <TableHead className="w-[80px] font-medium text-gray-800 text-center">Powiel</TableHead>
+                    )}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {loading ? (
                     Array(5).fill(0).map((_, i) => (
                       <TableRow key={i}>
-                        <TableCell colSpan={isRepresentative ? 12 : 13}>
+                        <TableCell colSpan={isRepresentative ? 12 : 14}>
                           <div className="h-10 w-full bg-gray-200 animate-pulse rounded" />
                         </TableCell>
                       </TableRow>
                     ))
                   ) : sortedCosts.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={isRepresentative ? 11 : 13} className="text-center py-8 text-gray-500">
+                      <TableCell colSpan={isRepresentative ? 11 : 14} className="text-center py-8 text-gray-500">
                         {isRepresentative
                           ? "Nie znaleziono kosztów powiązanych z Twoim kontem przedstawiciela."
                           : "Brak kosztów do wyświetlenia"}
@@ -1310,6 +1336,17 @@ const CostsView = () => {
                                 {getBranchDisplayName(cost.cost_branch)} {/* Zastosuj funkcję mapującą */}
                               </span>
                           </TableCell>
+                          {canAdd && !isRepresentative && (
+                              <TableCell className="text-center">
+                                <Button
+                                  onClick={() => handleDuplicateCost(cost)}
+                                  className="bg-green-600 text-white hover:bg-green-700 h-8 w-8 p-1.5"
+                                  title="Powiel koszt"
+                                >
+                                  <Copy className="h-4 w-4" />
+                                </Button>
+                              </TableCell>
+                          )}
                         </TableRow>
                       ))}
 
@@ -1343,6 +1380,9 @@ const CostsView = () => {
                           <TableCell className="text-center text-gray-700">
                             {costsSummary.count} poz.
                           </TableCell>
+                          {canAdd && !isRepresentative && (
+                            <TableCell className="text-center text-gray-700">-</TableCell>
+                          )}
                         </TableRow>
                       )}
                     </>
@@ -1410,6 +1450,33 @@ const CostsView = () => {
           userBranch={userBranch}
         />
       )}
+
+      {/* Dialog do powielania kosztów - kontrolowany przez stan */}
+      {!isRepresentative && canAdd && (
+        <AddCostDialog
+          onAddCost={(costData) => {
+            handleAddCost(costData);
+            setIsDuplicateDialogOpen(false); // Zamknij dialog po dodaniu
+          }}
+          selectedYear={selectedYear ?? yearsData?.currentYear}
+          userRole={userRole}
+          userBranch={userBranch}
+          isOpen={isDuplicateDialogOpen}
+          onOpenChange={setIsDuplicateDialogOpen}
+          initialData={costToDuplicate ? {
+            contractor: costToDuplicate.cost_contrahent,
+            nip: costToDuplicate.cost_nip,
+            invoiceNumber: costToDuplicate.cost_doc_no,
+            amount: costToDuplicate.cost_value.toString(),
+            month: costToDuplicate.cost_mo.toString(),
+            costType: costToDuplicate.cost_kind,
+            description: costToDuplicate.cost_4what,
+            costOwner: costToDuplicate.cost_own,
+            representative: costToDuplicate.cost_ph || '',
+            department: costToDuplicate.cost_branch,
+          } : undefined}
+        />
+    )}
     </div>
   );
 };

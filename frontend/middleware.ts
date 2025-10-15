@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { validateSession } from '@/lib/session'
 
-const protectedPaths = ['/dashboard', '/sales', '/costs', '/profits', '/map', '/settings']
+const protectedPaths = ['/dashboard', '/sales', '/costs', '/profits', '/map', '/settings', '/company']
 const authPaths = ['/login', '/reset-password']
 const PUBLIC_FILE = /\.(.*)$/
 
@@ -31,7 +31,7 @@ export async function middleware(request: NextRequest) {
 
   // If user is logged in and tries to access auth pages
   if (isValid && isAuthPath) {
-    const defaultRedirect = (userRole === 'ADMIN' || userRole === 'BOARD') ? '/dashboard' : '/costs'
+    const defaultRedirect = userRole === 'ADMIN' ? '/company' : (userRole === 'BOARD' ? '/dashboard' : '/costs')
     return NextResponse.redirect(new URL(defaultRedirect, request.url))
   }
 
@@ -44,7 +44,7 @@ export async function middleware(request: NextRequest) {
   // Redirect from homepage
   if (pathname === '/') {
     if (isValid) {
-      const defaultPage = (userRole === 'ADMIN' || userRole === 'BOARD') ? '/dashboard' : '/costs'
+      const defaultPage = userRole === 'ADMIN' ? '/company' : (userRole === 'BOARD' ? '/dashboard' : '/costs')
       return NextResponse.redirect(new URL(defaultPage, request.url))
     }
     return NextResponse.redirect(new URL('/login', request.url))

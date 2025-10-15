@@ -527,14 +527,16 @@ const EditCostDialog: React.FC<EditCostDialogProps> = ({
                 )}
               </div>
               <div className="flex flex-col">
-                <ScrollableSelect
+                <SearchableSelect
                   value={formData.month}
                   onValueChange={(value) => handleInputChange('month', value)}
                   placeholder="Wybierz miesiąc"
+                  expandUpward={false}
                   items={months.map(month => ({
                     value: month.value,
                     label: month.label
                   }))}
+                  emptyMessage="Nie znaleziono miesiąca"
                 />
                 {errors.month && (
                   <span className="text-red-500 text-sm mt-1">{errors.month}</span>
@@ -607,7 +609,7 @@ const EditCostDialog: React.FC<EditCostDialogProps> = ({
               </div>
 
               <div className="flex flex-col">
-                <ScrollableSelect
+                <SearchableSelect
                   value={formData.department}
                   onValueChange={(value) => handleDepartmentChange(value)}
                   placeholder="Oddział"
@@ -616,6 +618,7 @@ const EditCostDialog: React.FC<EditCostDialogProps> = ({
                     value: dept.value,
                     label: dept.label
                   }))}
+                  emptyMessage="Nie znaleziono oddziału"
                 />
                 {errors.department && (
                   <span className="text-red-500 text-sm mt-1">{errors.department}</span>

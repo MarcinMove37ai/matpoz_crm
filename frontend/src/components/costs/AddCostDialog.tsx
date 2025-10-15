@@ -25,6 +25,20 @@ interface AddCostDialogProps {
   selectedYear?: number;
   userRole?: string;
   userBranch?: string;
+  initialData?: {
+    contractor?: string;
+    nip?: string;
+    invoiceNumber?: string;
+    amount?: string;
+    month?: string;
+    costType?: string;
+    description?: string;
+    costOwner?: string;
+    representative?: string;
+    department?: string;
+  }
+  isOpen?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 interface FormErrors {
@@ -70,10 +84,13 @@ const AddCostDialog: React.FC<AddCostDialogProps> = ({
   representatives: providedRepresentatives,
   selectedYear,
   userRole,
-  userBranch
+  userBranch,
+  initialData,
+  isOpen: externalIsOpen,
+  onOpenChange: externalOnOpenChange
 }) => {
   const { user } = useAuth();
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
   const [costTypes, setCostTypes] = useState<Array<{ id: string, kind: string }>>([]);
   const [representativesList, setRepresentativesList] = useState<Array<{ id: string, name: string }>>([]);
   const [selectedDepartment, setSelectedDepartment] = useState('');
@@ -81,6 +98,8 @@ const AddCostDialog: React.FC<AddCostDialogProps> = ({
   const [previousDescription, setPreviousDescription] = useState('');
   // Dodaj tę linię po deklaracji costTypes
   const normalizedBranch = React.useMemo(() => normalizeBranchName(userBranch || ''), [userBranch]);
+  const open = externalIsOpen !== undefined ? externalIsOpen : internalOpen;
+  const setOpen = externalOnOpenChange || setInternalOpen;
 
   const getAvailableDepartments = () => {
     if (userRole === 'ADMIN' || userRole === 'BASIA') {
@@ -309,12 +328,32 @@ const AddCostDialog: React.FC<AddCostDialogProps> = ({
     }
   }, [userRole, userBranch, normalizedBranch]);
 
+
   useEffect(() => {
-      // Przy zamknięciu formularza, zresetuj go
-      if (!open) {
-        resetForm();
-      }
-  }, [open]); // Usuwamy zależności, które mogą powodować nieskończoną pętlę
+    if (open && initialData) {
+      setFormData(prev => ({
+        ...prev,
+        contractor: initialData.contractor || '',
+        nip: initialData.nip || '',
+        invoiceNumber: initialData.invoiceNumber || '',
+        amount: initialData.amount || '',
+        month: initialData.month || '',
+        costType: initialData.costType || '',
+        description: initialData.description || '',
+        costOwner: initialData.costOwner || '',
+        representative: initialData.representative || '',
+        department: initialData.department || prev.department,
+      }));
+    }
+  }, [open, initialData]);
+
+  // Resetuj formularz tylko przy otwieraniu dialogu (nie przy zamykaniu)
+  useEffect(() => {
+    if (open && !initialData) {
+      // Resetuj tylko gdy otwieramy dialog bez danych początkowych
+      resetForm();
+    }
+  }, [open, initialData]);
 
   const validateForm = (): boolean => {
     const newErrors: FormErrors = {};
@@ -358,33 +397,33 @@ const AddCostDialog: React.FC<AddCostDialogProps> = ({
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
-      e.preventDefault();
+    e.preventDefault();
 
-      if (validateForm()) {
-        try {
-          const costData = mapFormDataToCostData({
-            ...formData,
-            year: selectedYear || new Date().getFullYear(),
-            author: user?.fullName || user?.username || ''
-          });
+    if (validateForm()) {
+      try {
+        const costData = mapFormDataToCostData({
+          ...formData,
+          year: selectedYear || new Date().getFullYear(),
+          author: user?.fullName || user?.username || ''
+        });
 
-          await costsService.createCost(costData);
+        await costsService.createCost(costData);
 
-          setNotification({
-            type: 'success',
-            message: 'Koszt został pomyślnie dodany'
-          });
+        setNotification({
+          type: 'success',
+          message: 'Koszt został pomyślnie dodany'
+        });
 
-          onAddCost(costData);
-          setOpen(false);
-          resetForm();
-        } catch (error) {
-          setNotification({
-            type: 'error',
-            message: error instanceof Error ? error.message : 'Wystąpił błąd podczas zapisywania kosztu'
-          });
-        }
+        onAddCost(costData);
+        setOpen(false);
+        resetForm(); // Resetuj TYLKO po pomyślnym dodaniu
+      } catch (error) {
+        setNotification({
+          type: 'error',
+          message: error instanceof Error ? error.message : 'Wystąpił błąd podczas zapisywania kosztu'
+        });
       }
+    }
   };
 
   const handleInputChange = (field: string, value: string) => {
@@ -485,7 +524,11 @@ const AddCostDialog: React.FC<AddCostDialogProps> = ({
           <span>Dodaj koszt</span>
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-blue-50" aria-describedby="dialog-description">
+      <DialogContent
+          onCloseAutoFocus={(e) => e.preventDefault()}
+          className="max-w-2xl max-h-[90vh] overflow-y-auto bg-blue-50"
+          aria-describedby="dialog-description"
+      >
         <DialogHeader>
           <DialogTitle className="text-xl font-semibold text-gray-800">
               Dodaj nowy koszt{selectedYear ? ` dla roku ${selectedYear}` : ''}
@@ -575,14 +618,16 @@ const AddCostDialog: React.FC<AddCostDialogProps> = ({
                 )}
               </div>
               <div className="flex flex-col">
-                  <ScrollableSelect
+                  <SearchableSelect
                     value={formData.month}
                     onValueChange={(value) => handleInputChange('month', value)}
                     placeholder="Wybierz miesiąc"
+                    expandUpward={false}
                     items={months.map(month => ({
                       value: month.value,
                       label: month.label
                     }))}
+                    emptyMessage="Nie znaleziono miesiąca"
                   />
                   {errors.month && (
                     <span className="text-red-500 text-sm mt-1">{errors.month}</span>
@@ -655,7 +700,7 @@ const AddCostDialog: React.FC<AddCostDialogProps> = ({
               </div>
 
               <div className="flex flex-col">
-                  <ScrollableSelect
+                  <SearchableSelect
                     value={formData.department}
                     onValueChange={(value) => handleDepartmentChange(value)}
                     placeholder="Oddział"
@@ -664,6 +709,7 @@ const AddCostDialog: React.FC<AddCostDialogProps> = ({
                       value: dept.value,
                       label: dept.label
                     }))}
+                    emptyMessage="Nie znaleziono oddziału"
                   />
                   {errors.department && (
                     <span className="text-red-500 text-sm mt-1">{errors.department}</span>
