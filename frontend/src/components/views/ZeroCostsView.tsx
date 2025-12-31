@@ -29,7 +29,7 @@ import { Button } from "@/components/ui/button";
 // Dodano ikonę Copy i ArrowUpDown
 import { AlertCircle, Plus, ChevronLeft, ChevronRight, X, Copy, Calendar, ArrowUpDown } from 'lucide-react';
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import SearchableSelect from '@/components/ui/SearchableSelect';
+import ScrollableSelect from '@/components/ui/ScrollableSelect';
 // Import Toasta
 import { useToast } from "@/context/ToastContext";
 
@@ -85,7 +85,7 @@ const ZeroCostsView = () => {
     fetchReps();
   }, []);
 
-  const branchOptions = useMemo(() => [
+  const branchItems = useMemo(() => [
     { value: 'all', label: 'Wszystkie oddziały' },
     { value: 'Rzgów', label: 'Rzgów' },
     { value: 'Lublin', label: 'Lublin' },
@@ -99,7 +99,7 @@ const ZeroCostsView = () => {
     { value: 'BHP', label: 'BHP' },
   ], []);
 
-  const repOptions = useMemo(() => [
+  const repItems = useMemo(() => [
     { value: 'all', label: 'Wszyscy PH' },
     ...representativesList.map(rep => ({ value: rep, label: rep }))
   ], [representativesList]);
@@ -279,18 +279,18 @@ const ZeroCostsView = () => {
                 <div className="flex flex-col min-w-[180px] flex-1">
                   <label className="text-sm font-medium text-[#374151] mb-1.5">Oddział</label>
                   <SearchableSelect
-                    options={branchOptions}
+                    items={branchItems}
                     value={selectedBranch || 'all'}
-                    onChange={setSelectedBranch}
+                    onValueChange={setSelectedBranch}
                     placeholder="Wybierz oddział"
                   />
                 </div>
                 <div className="flex flex-col min-w-[180px] flex-1">
                   <label className="text-sm font-medium text-[#374151] mb-1.5">Przedstawiciel</label>
                   <SearchableSelect
-                    options={repOptions}
+                    items={repItems}
                     value={selectedRep || 'all'}
-                    onChange={setSelectedRep}
+                    onValueChange={setSelectedRep}
                     placeholder="Wybierz PH"
                   />
                 </div>
