@@ -26,8 +26,8 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-// Dodano ikonę Copy
-import { AlertCircle, Plus, ChevronLeft, ChevronRight, X, Copy, Calendar } from 'lucide-react';
+// Dodano ikonę Copy i ArrowUpDown
+import { AlertCircle, Plus, ChevronLeft, ChevronRight, X, Copy, Calendar, ArrowUpDown } from 'lucide-react';
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import SearchableSelect from '@/components/ui/SearchableSelect';
 // Import Toasta
@@ -56,6 +56,9 @@ const ZeroCostsView = () => {
     limit: 20,
     offset: 0
   });
+
+  // State dla sortowania
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc' | null>(null);
 
   useEffect(() => {
     const today = new Date();
@@ -182,6 +185,30 @@ const ZeroCostsView = () => {
       position: { x: e.clientX, y: e.clientY } // Współrzędne kursora
     });
   };
+
+  // --- FUNKCJA SORTOWANIA ---
+  const handleSort = () => {
+    if (sortOrder === null) {
+      setSortOrder('desc');
+    } else if (sortOrder === 'desc') {
+      setSortOrder('asc');
+    } else {
+      setSortOrder(null);
+    }
+  };
+
+  // Posortowane transakcje
+  const sortedTransactions = useMemo(() => {
+    if (!sortOrder) return transactions;
+
+    return [...transactions].sort((a, b) => {
+      if (sortOrder === 'asc') {
+        return a.net_value - b.net_value;
+      } else {
+        return b.net_value - a.net_value;
+      }
+    });
+  }, [transactions, sortOrder]);
 
   const formatCurrency = (val: number) =>
     val.toLocaleString('pl-PL', { style: 'currency', currency: 'PLN', minimumFractionDigits: 2 });
@@ -350,7 +377,20 @@ const ZeroCostsView = () => {
                   <TableHead className="font-bold text-[#111827] text-xs">Data</TableHead>
                   <TableHead className="font-bold text-[#111827] text-xs">Nr Dokumentu</TableHead>
                   <TableHead className="font-bold text-[#111827] text-xs">Kontrahent (NIP)</TableHead>
-                  <TableHead className="text-right font-bold text-[#111827] text-xs">Netto</TableHead>
+                  <TableHead
+                    className="text-right font-bold text-[#111827] text-xs cursor-pointer hover:bg-[#e5e7eb] select-none"
+                    onClick={handleSort}
+                  >
+                    <div className="flex items-center justify-end gap-1">
+                      <span>Netto</span>
+                      <ArrowUpDown className="h-3 w-3" />
+                      {sortOrder && (
+                        <span className="text-[10px] text-[#2563eb]">
+                          {sortOrder === 'asc' ? '↑' : '↓'}
+                        </span>
+                      )}
+                    </div>
+                  </TableHead>
                   <TableHead className="text-right font-bold text-[#111827] text-xs">Zysk</TableHead>
                   <TableHead className="text-center font-bold text-[#111827] text-xs">Marża</TableHead>
                   <TableHead className="font-bold text-[#111827] text-xs">Przedstawiciel</TableHead>
@@ -365,14 +405,14 @@ const ZeroCostsView = () => {
                       <TableCell colSpan={10}><div className="h-4 bg-[#f3f4f6] animate-pulse rounded w-full"></div></TableCell>
                     </TableRow>
                    ))
-                ) : transactions.length === 0 ? (
+                ) : sortedTransactions.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={10} className="text-center py-10 text-[#6b7280]">
                         Brak błędnych transakcji w wybranym okresie.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  transactions.map((item, index) => (
+                  sortedTransactions.map((item, index) => (
                     <TableRow
                       key={item.id}
                       className={`border-b border-[#e5e7eb] transition-colors h-9 ${
