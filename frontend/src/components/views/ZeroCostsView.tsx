@@ -26,8 +26,8 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-// Dodano ikonę Copy
-import { AlertCircle, Plus, ChevronLeft, ChevronRight, X, Copy, Calendar } from 'lucide-react';
+// Dodano ikonę Copy i ArrowUpDown
+import { AlertCircle, Plus, ChevronLeft, ChevronRight, X, Copy, Calendar, ArrowUpDown } from 'lucide-react';
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import SearchableSelect from '@/components/ui/SearchableSelect';
 // Import Toasta
@@ -56,6 +56,9 @@ const ZeroCostsView = () => {
     limit: 20,
     offset: 0
   });
+
+  // State dla sortowania
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc' | null>(null);
 
   useEffect(() => {
     const today = new Date();
@@ -183,131 +186,133 @@ const ZeroCostsView = () => {
     });
   };
 
-  const formatCurrency = (val: number) =>
-    val.toLocaleString('pl-PL', { style: 'currency', currency: 'PLN', minimumFractionDigits: 2 });
-
-  const formatDate = (dateStr: string) => {
-    if (!dateStr) return '-';
-    return new Date(dateStr).toLocaleDateString('pl-PL');
+  // --- FUNKCJA SORTOWANIA ---
+  const handleSort = () => {
+    if (sortOrder === null) {
+      setSortOrder('desc');
+    } else if (sortOrder === 'desc') {
+      setSortOrder('asc');
+    } else {
+      setSortOrder(null);
+    }
   };
 
-  const isFilterActive = (val: string | null) => val && val !== 'all';
+  // Posortowane transakcje
+  const sortedTransactions = useMemo(() => {
+    if (!sortOrder) return transactions;
 
-  // Ograniczenia dla kalendarza (blokada wyboru spoza roku)
-  const minDate = selectedYear ? `${selectedYear}-01-01` : undefined;
-  const maxDate = selectedYear ? `${selectedYear}-12-31` : undefined;
+    return [...transactions].sort((a, b) => {
+      if (sortOrder === 'asc') {
+        return a.net_value - b.net_value;
+      } else {
+        return b.net_value - a.net_value;
+      }
+    });
+  }, [transactions, sortOrder]);
 
-  const clearButtonStyle = "absolute right-10 top-1/2 -translate-y-1/2 text-red-500 hover:text-red-700 transition-colors duration-200 z-10";
+  const formatCurrency = (val: number) =>
+    new Intl.NumberFormat('pl-PL', { style: 'currency', currency: 'PLN' }).format(val);
 
-  if (yearsLoading) return <div className="p-6 text-[#111827]">Ładowanie konfiguracji...</div>;
+  const formatDate = (dateStr: string) => {
+    const [year, month, day] = dateStr.split('-');
+    return `${day}.${month}.${year}`;
+  };
+
+  const currentPage = Math.floor(pagination.offset / pagination.limit) + 1;
+  const totalPages = Math.ceil(pagination.total / pagination.limit);
 
   return (
-    <div className="space-y-4">
-      {/* HEADER + ROK */}
-      <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-[#ffffff] p-4 rounded-lg border border-[#e5e7eb] shadow-sm">
-        <div>
-          <h2 className="text-xl font-bold text-[#111827]">Weryfikacja Marży</h2>
-          <p className="text-sm text-[#6b7280]">Transakcje gdzie Zysk = Wartość Netto (Brak kosztów)</p>
-        </div>
-
-        <div className="w-full md:w-auto hidden md:block">
-          <Select
-            value={selectedYear?.toString() ?? ''}
-            onValueChange={(value) => setSelectedYear(value ? parseInt(value) : null)}
-          >
-            <SelectTrigger className="w-[140px] border-[#bfdbfe] bg-[#eff6ff] text-[#1e3a8a] font-medium">
-              <SelectValue placeholder="Wybierz rok" />
-            </SelectTrigger>
-            <SelectContent side="bottom">
-              {yearsData?.years?.map((year) => (
-                <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      {/* FILTRY */}
+    <div className="w-full h-full overflow-y-auto space-y-4 pb-4">
       <Card className="w-full bg-[#ffffff] border border-[#e5e7eb] shadow-sm">
-        <CardContent className="p-4">
-          <div className="flex flex-wrap gap-4 items-end">
-            {/* --- FILTR: DATA OD (Z ograniczeniem roku) --- */}
-            <div className="w-full md:w-auto relative">
-                <div className="relative">
-                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500 z-10 pointer-events-none" />
-                    <Input
-                        type="date"
-                        value={dateFrom}
-                        onChange={(e) => setDateFrom(e.target.value)}
-                        onClick={(e) => (e.target as HTMLInputElement).showPicker()}
-                        onKeyDown={(e) => e.preventDefault()}
-                        min={minDate}
-                        max={maxDate}
-                        className="w-full md:w-[150px] pl-10 bg-[#ffffff] border-[#d1d5db] text-[#111827] focus:ring-[#dbeafe] focus:border-[#3b82f6] cursor-pointer caret-transparent shadow-sm [&::-webkit-calendar-picker-indicator]:hidden"
-                        title="Data od"
-                    />
+        <CardContent className="p-5">
+          <h2 className="text-xl font-bold text-[#111827] mb-5">Filtry wyszukiwania</h2>
+
+          <div className="flex flex-col md:flex-row md:items-end gap-3 flex-wrap">
+            <div className="flex flex-col min-w-[150px] flex-1">
+              <label className="text-sm font-medium text-[#374151] mb-1.5">Rok</label>
+              <Select
+                value={selectedYear?.toString() || ''}
+                onValueChange={(val) => setSelectedYear(Number(val))}
+                disabled={yearsLoading}
+              >
+                <SelectTrigger className="h-9 bg-[#f9fafb] border-[#d1d5db] text-[#111827]">
+                  <SelectValue placeholder={yearsLoading ? "Ładowanie..." : "Wybierz rok"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {yearsData?.years.map((year) => (
+                    <SelectItem key={year} value={year.toString()}>
+                      {year}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex flex-col min-w-[150px] flex-1">
+              <label className="text-sm font-medium text-[#374151] mb-1.5">Data od</label>
+              <div className="relative">
+                <Input
+                  type="date"
+                  value={dateFrom}
+                  onChange={(e) => setDateFrom(e.target.value)}
+                  className="h-9 bg-[#f9fafb] border-[#d1d5db] text-[#111827] pr-9"
+                />
+                <Calendar className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#6b7280] pointer-events-none" />
+              </div>
+            </div>
+
+            <div className="flex flex-col min-w-[150px] flex-1">
+              <label className="text-sm font-medium text-[#374151] mb-1.5">Data do</label>
+              <div className="relative">
+                <Input
+                  type="date"
+                  value={dateTo}
+                  onChange={(e) => setDateTo(e.target.value)}
+                  className="h-9 bg-[#f9fafb] border-[#d1d5db] text-[#111827] pr-9"
+                />
+                <Calendar className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#6b7280] pointer-events-none" />
+              </div>
+            </div>
+
+            {userRole === 'ADMIN' && (
+              <>
+                <div className="flex flex-col min-w-[180px] flex-1">
+                  <label className="text-sm font-medium text-[#374151] mb-1.5">Oddział</label>
+                  <SearchableSelect
+                    options={branchOptions}
+                    value={selectedBranch || 'all'}
+                    onChange={setSelectedBranch}
+                    placeholder="Wybierz oddział"
+                  />
                 </div>
-            </div>
-
-            {/* --- FILTR: DATA DO (Z ograniczeniem roku) --- */}
-            <div className="w-full md:w-auto relative">
-                <div className="relative">
-                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500 z-10 pointer-events-none" />
-                    <Input
-                        type="date"
-                        value={dateTo}
-                        onChange={(e) => setDateTo(e.target.value)}
-                        onClick={(e) => (e.target as HTMLInputElement).showPicker()}
-                        onKeyDown={(e) => e.preventDefault()}
-                        min={minDate}
-                        max={maxDate}
-                        className="w-full md:w-[150px] pl-10 bg-[#ffffff] border-[#d1d5db] text-[#111827] focus:ring-[#dbeafe] focus:border-[#3b82f6] cursor-pointer caret-transparent shadow-sm [&::-webkit-calendar-picker-indicator]:hidden"
-                        title="Data do"
-                    />
+                <div className="flex flex-col min-w-[180px] flex-1">
+                  <label className="text-sm font-medium text-[#374151] mb-1.5">Przedstawiciel</label>
+                  <SearchableSelect
+                    options={repOptions}
+                    value={selectedRep || 'all'}
+                    onChange={setSelectedRep}
+                    placeholder="Wybierz PH"
+                  />
                 </div>
-            </div>
+              </>
+            )}
 
-            {/* --- FILTR: ODDZIAŁ (Bez etykiety) --- */}
-            <div className="w-full md:w-56 relative">
-              <SearchableSelect
-                value={selectedBranch ?? 'all'}
-                onValueChange={(val) => setSelectedBranch(val === 'all' ? null : val)}
-                items={branchOptions}
-                placeholder="Wszystkie oddziały"
-                disabled={userRole === 'BRANCH' || userRole === 'REPRESENTATIVE'}
-                // Styl aktywnego filtra (zielony)
-                className={isFilterActive(selectedBranch) ? 'bg-[#f0fdf4] border-[#bbf7d0] text-[#166534]' : ''}
-                expandUpward={false}
-              />
-              {isFilterActive(selectedBranch) && userRole !== 'BRANCH' && (
-                <button
-                  onClick={() => setSelectedBranch(null)}
-                  // ZMIANA: top-1/2 (środek relatywny do pola, bo nie ma etykiety)
-                  className="absolute right-10 top-1/2 -translate-y-1/2 text-[#ef4444] hover:text-[#b91c1c] transition-colors p-1"
-                  title="Wyczyść filtr"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              )}
-            </div>
+            <div className="flex items-end gap-2 pt-4 md:pt-0">
+              <Button
+                onClick={fetchTransactions}
+                disabled={isLoading}
+                className="h-9 bg-[#2563eb] hover:bg-[#1d4ed8] text-[#ffffff] px-5 font-medium"
+              >
+                {isLoading ? 'Szukam...' : 'Szukaj'}
+              </Button>
 
-            {/* --- FILTR: PRZEDSTAWICIEL (Bez etykiety) --- */}
-            <div className="w-full md:w-56 relative">
-              <SearchableSelect
-                value={selectedRep ?? 'all'}
-                onValueChange={(val) => setSelectedRep(val === 'all' ? null : val)}
-                items={repOptions}
-                placeholder="Wszyscy PH"
-                disabled={userRole === 'REPRESENTATIVE'}
-                // Styl aktywnego filtra (zielony)
-                className={isFilterActive(selectedRep) ? 'bg-[#f0fdf4] border-[#bbf7d0] text-[#166534]' : ''}
-                expandUpward={false}
-              />
-               {isFilterActive(selectedRep) && userRole !== 'REPRESENTATIVE' && (
+              {(selectedBranch !== 'all' || selectedRep !== 'all') && (
                 <button
-                  onClick={() => setSelectedRep(null)}
-                  // ZMIANA: top-1/2 (środek relatywny do pola)
-                  className="absolute right-10 top-1/2 -translate-y-1/2 text-[#ef4444] hover:text-[#b91c1c] transition-colors p-1"
+                  onClick={() => {
+                    setSelectedBranch('all');
+                    setSelectedRep('all');
+                  }}
+                  className="h-9 w-9 flex items-center justify-center bg-[#fee2e2] hover:bg-[#fecaca] text-[#dc2626] border border-[#fecaca] rounded transition-colors"
                   title="Wyczyść filtr"
                 >
                   <X className="h-4 w-4" />
@@ -350,7 +355,20 @@ const ZeroCostsView = () => {
                   <TableHead className="font-bold text-[#111827] text-xs">Data</TableHead>
                   <TableHead className="font-bold text-[#111827] text-xs">Nr Dokumentu</TableHead>
                   <TableHead className="font-bold text-[#111827] text-xs">Kontrahent (NIP)</TableHead>
-                  <TableHead className="text-right font-bold text-[#111827] text-xs">Netto</TableHead>
+                  <TableHead
+                    className="text-right font-bold text-[#111827] text-xs cursor-pointer hover:bg-[#e5e7eb] select-none"
+                    onClick={handleSort}
+                  >
+                    <div className="flex items-center justify-end gap-1">
+                      <span>Netto</span>
+                      <ArrowUpDown className="h-3 w-3" />
+                      {sortOrder && (
+                        <span className="text-[10px] text-[#2563eb]">
+                          {sortOrder === 'asc' ? '↑' : '↓'}
+                        </span>
+                      )}
+                    </div>
+                  </TableHead>
                   <TableHead className="text-right font-bold text-[#111827] text-xs">Zysk</TableHead>
                   <TableHead className="text-center font-bold text-[#111827] text-xs">Marża</TableHead>
                   <TableHead className="font-bold text-[#111827] text-xs">Przedstawiciel</TableHead>
@@ -365,14 +383,14 @@ const ZeroCostsView = () => {
                       <TableCell colSpan={10}><div className="h-4 bg-[#f3f4f6] animate-pulse rounded w-full"></div></TableCell>
                     </TableRow>
                    ))
-                ) : transactions.length === 0 ? (
+                ) : sortedTransactions.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={10} className="text-center py-10 text-[#6b7280]">
                         Brak błędnych transakcji w wybranym okresie.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  transactions.map((item, index) => (
+                  sortedTransactions.map((item, index) => (
                     <TableRow
                       key={item.id}
                       className={`border-b border-[#e5e7eb] transition-colors h-9 ${
