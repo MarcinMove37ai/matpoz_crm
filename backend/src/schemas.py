@@ -96,3 +96,24 @@ class AggregatedStats(BaseModel):
 class HistoricalStats(AggregatedStats):
     month: str
     year: int
+
+# --- NOWE SCHEMATY DLA ZERO MARGIN (WERYFIKACJA KOSZTÓW) ---
+
+class ZeroMarginTransaction(BaseModel):
+    id: int
+    date: datetime
+    doc_no: str
+    nip: Optional[str] = None  # Odpowiada kolumnie customer_nip
+    net_value: float
+    profit: float
+    representative: Optional[str] = None # Odpowiada kolumnie representative_name
+    branch: str # Odpowiada kolumnie branch_name
+
+    class Config:
+        from_attributes = True
+
+class PaginatedZeroMarginResponse(BaseModel):
+    data: List[ZeroMarginTransaction]
+    total: int
+    limit: int
+    offset: int

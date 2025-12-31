@@ -15,15 +15,11 @@ from models.transaction import (
 )
 from database import get_db
 import schemas
-
+from sqlalchemy import case, literal_column
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-
-# Dodaj ten kod do pliku routes/transactions.py
-
-from sqlalchemy import case, literal_column
 
 @router.get("/aggregated_profits")
 def get_aggregated_profits(
@@ -258,24 +254,6 @@ def refresh_aggregate_data(db: Session):
         logger.error(f"Błąd podczas odświeżania agregatów w tle: {e}")
 
 
-# Funkcja odświeżająca agregaty w tle
-async def refresh_aggregate_data(db_connection):
-    try:
-        async with create_async_session(db_connection) as session:
-            # Włącz z powrotem triggery
-            await session.execute(text("ALTER TABLE config_current_date ENABLE TRIGGER ALL"))
-
-            # Ręcznie wywołaj odświeżenie agregatów
-            await session.execute(text("SELECT populate_aggregated_data()"))
-            await session.execute(text("SELECT populate_aggregated_data_hist()"))
-            await session.execute(text("SELECT populate_aggregated_data_sums()"))
-            await session.execute(text("SELECT refresh_aggregated_sales_data()"))
-            await session.execute(text("SELECT refresh_representative_aggregated_data()"))
-
-            await session.commit()
-            logger.info("Pomyślnie odświeżono agregaty w tle")
-    except Exception as e:
-        logger.error(f"Błąd podczas odświeżania agregatów w tle: {e}")
 @router.get("/representatives")
 def get_representatives(
         db: Session = Depends(get_db),
@@ -337,6 +315,7 @@ def get_representatives(
         logger.error(f"Error in /representatives endpoint: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
 
+
 @router.post("/cost_kinds", response_model=schemas.CostKind)
 def create_cost_kind(cost_kind: schemas.CostKindCreate, db: Session = Depends(get_db)):
     db_cost_kind = CostKind(kind=cost_kind.kind)
@@ -344,12 +323,15 @@ def create_cost_kind(cost_kind: schemas.CostKindCreate, db: Session = Depends(ge
     db.commit()
     db.refresh(db_cost_kind)
     return db_cost_kind
+
+
 @router.get("/cost_kinds/{cost_kind_id}", response_model=schemas.CostKind)
 def read_cost_kind(cost_kind_id: int, db: Session = Depends(get_db)):
     cost_kind = db.query(CostKind).filter(CostKind.id == cost_kind_id).first()
     if not cost_kind:
         raise HTTPException(status_code=404, detail="Cost kind not found")
     return cost_kind
+
 
 @router.put("/cost_kinds/{cost_kind_id}", response_model=schemas.CostKind)
 def update_cost_kind(cost_kind_id: int, cost_kind: schemas.CostKindUpdate, db: Session = Depends(get_db)):
@@ -361,6 +343,7 @@ def update_cost_kind(cost_kind_id: int, cost_kind: schemas.CostKindUpdate, db: S
     db.refresh(db_cost_kind)
     return db_cost_kind
 
+
 @router.delete("/cost_kinds/{cost_kind_id}")
 def delete_cost_kind(cost_kind_id: int, db: Session = Depends(get_db)):
     db_cost_kind = db.query(CostKind).filter(CostKind.id == cost_kind_id).first()
@@ -369,6 +352,88 @@ def delete_cost_kind(cost_kind_id: int, db: Session = Depends(get_db)):
     db.delete(db_cost_kind)
     db.commit()
     return {"ok": True}
+
+
+# --- NOWY ENDPOINT DLA ZEROWEJ MARŻY (KROK 1) ---
+@router.get("/transactions/zero-margin", response_model=schemas.PaginatedZeroMarginResponse)
+def get_zero_margin_transactions(
+        db: Session = Depends(get_db),
+        year: int = Query(None),
+        branch: str = Query(None),
+        representative: str = Query(None),
+        date_from: str = Query(None),
+        date_to: str = Query(None),
+        limit: int = Query(20, ge=1, le=100),
+        offset: int = Query(0, ge=0)
+):
+    """
+    Pobiera transakcje, które mają 100% marży (Zysk == Netto).
+    Dopuszczamy minimalną różnicę 0.02 PLN na błędy zaokrągleń.
+    """
+    try:
+        query = db.query(Transaction)
+
+        # 1. Główny warunek: Netto > 0 ORAZ |Netto - Zysk| < 0.02
+        # Używamy func.abs() dla bezpiecznego porównania liczb zmiennoprzecinkowych
+        query = query.filter(
+            Transaction.net_value > 0,
+            func.abs(Transaction.net_value - Transaction.profit) < 0.02
+        )
+
+        # 2. Filtrowanie dynamiczne
+        if year:
+            query = query.filter(Transaction.year == year)
+
+        if branch and branch != 'all':
+            query = query.filter(Transaction.branch_name == branch)
+
+        if representative and representative != 'all':
+            query = query.filter(Transaction.representative_name == representative)
+
+        if date_from:
+            query = query.filter(Transaction.created_at >= date_from)
+
+        if date_to:
+            # Dodajemy czas 23:59:59 dla daty końcowej, aby objąć cały dzień
+            query = query.filter(Transaction.created_at <= f"{date_to} 23:59:59")
+
+        # 3. Liczenie całkowitej ilości (dla paginacji)
+        total = query.count()
+
+        # 4. Pobieranie danych z limitem i offsetem
+        transactions = query.order_by(Transaction.created_at.desc()) \
+            .offset(offset) \
+            .limit(limit) \
+            .all()
+
+        # 5. Mapowanie modelu DB na schemat Pydantic
+        # Zauważ mapowanie: document_number -> doc_no, customer_nip -> nip
+        mapped_data = []
+        for t in transactions:
+            mapped_data.append(schemas.ZeroMarginTransaction(
+                id=t.id,
+                date=t.created_at,
+                doc_no=t.document_number,
+                nip=t.customer_nip,  # W bazie jest NIP, nie nazwa kontrahenta
+                net_value=float(t.net_value or 0),
+                profit=float(t.profit or 0),
+                representative=t.representative_name,
+                branch=t.branch_name
+            ))
+
+        return {
+            "data": mapped_data,
+            "total": total,
+            "limit": limit,
+            "offset": offset
+        }
+
+    except Exception as e:
+        logger.error(f"Error in /transactions/zero-margin: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# -----------------------------------------------
 
 
 @router.get("/years")
@@ -393,6 +458,8 @@ async def get_transaction_years(db: Session = Depends(get_db)):
     except Exception as e:
         logger.error(f"Error in /years endpoint: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
+
+
 @router.get("/date")
 async def get_current_date(db: Session = Depends(get_db)):
     """
@@ -418,6 +485,8 @@ async def get_current_date(db: Session = Depends(get_db)):
     except Exception as e:
         logger.error(f"Error in /date endpoint: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
+
+
 @router.get("/health", include_in_schema=False)
 def health_check():
     """
@@ -425,6 +494,7 @@ def health_check():
     Ustawienie include_in_schema na False powoduje, że endpoint nie pojawi się w dokumentacji OpenAPI.
     """
     return {"status": "ok"}
+
 
 @router.get("/first_stats")
 def get_first_stats(
@@ -537,10 +607,11 @@ def get_first_stats(
         logger.error(f"Error in /first_stats endpoint: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
 
+
 @router.get("/sum_stats")
 def get_sum_stats(
-    db: Session = Depends(get_db),
-    measure_timings: bool = Query(False, description="If true - add execution times for sequences")
+        db: Session = Depends(get_db),
+        measure_timings: bool = Query(False, description="If true - add execution times for sequences")
 ):
     """
     Returns yearly aggregated statistics from AggregatedDataSums table.
@@ -638,6 +709,7 @@ def get_sum_stats(
     except Exception as e:
         logger.error(f"Error in /sum_stats endpoint: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
+
 
 @router.get("/second_stats")
 def get_second_stats(
@@ -816,31 +888,33 @@ def get_aggregated_sales_data(
                 aggregated_columns.append(
                     (100.0 * func.sum(AggregatedSalesData.asd_sales_payd) /
                      func.nullif(func.sum(AggregatedSalesData.asd_sales_net), 0)
-                    ).label('asd_sales_payd_percent')
+                     ).label('asd_sales_payd_percent')
                 )
             if AggregatedSalesData.asd_sales_ph_percent in selected_columns:
                 aggregated_columns.append(
                     (100.0 * func.sum(AggregatedSalesData.asd_sales_ph) /
                      func.nullif(func.sum(AggregatedSalesData.asd_sales_net), 0)
-                    ).label('asd_sales_ph_percent')
+                     ).label('asd_sales_ph_percent')
                 )
             if AggregatedSalesData.asd_marg_total in selected_columns:
                 aggregated_columns.append(
                     (100.0 * func.sum(AggregatedSalesData.asd_profit_net) /
                      func.nullif(func.sum(AggregatedSalesData.asd_sales_net), 0)
-                    ).label('asd_marg_total')
+                     ).label('asd_marg_total')
                 )
             if AggregatedSalesData.asd_marg_ph in selected_columns:
                 aggregated_columns.append(
                     (100.0 * func.sum(AggregatedSalesData.asd_profit_ph) /
                      func.nullif(func.sum(AggregatedSalesData.asd_sales_ph), 0)
-                    ).label('asd_marg_ph')
+                     ).label('asd_marg_ph')
                 )
             if AggregatedSalesData.asd_marg_branch in selected_columns:
                 aggregated_columns.append(
-                    (100.0 * (func.sum(AggregatedSalesData.asd_profit_net) - func.sum(AggregatedSalesData.asd_profit_ph)) /
-                     func.nullif(func.sum(AggregatedSalesData.asd_sales_net) - func.sum(AggregatedSalesData.asd_sales_ph), 0)
-                    ).label('asd_marg_branch')
+                    (100.0 * (func.sum(AggregatedSalesData.asd_profit_net) - func.sum(
+                        AggregatedSalesData.asd_profit_ph)) /
+                     func.nullif(
+                         func.sum(AggregatedSalesData.asd_sales_net) - func.sum(AggregatedSalesData.asd_sales_ph), 0)
+                     ).label('asd_marg_branch')
                 )
 
             query = query.with_entities(*aggregated_columns)
@@ -889,10 +963,11 @@ def get_aggregated_sales_data(
         logger.error(f"Error in /aggregated_sales_data endpoint: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
 
+
 @router.get("/all_stats")
 def get_all_stats(
-    db: Session = Depends(get_db),
-    measure_timings: bool = Query(False, description="Jeśli true – dodaj czasy wykonania poszczególnych sekwencji")
+        db: Session = Depends(get_db),
+        measure_timings: bool = Query(False, description="Jeśli true – dodaj czasy wykonania poszczególnych sekwencji")
 ):
     """
     Zwraca statystyki dla:

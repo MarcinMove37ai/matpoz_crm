@@ -5,7 +5,7 @@ import React, { useState, ReactNode, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import type { LucideIcon } from 'lucide-react';
-import { BarChart3, ClipboardList, PiggyBank, TrendingUp, Map, Settings, Menu, X, Power, UserSearch, BarChart4, Flame, Ship, ChartNoAxesCombined, ChartPie, ChartBarStacked, Building } from 'lucide-react';
+import { BarChart3, ClipboardList, PiggyBank, TrendingUp, Map, Settings, Menu, X, Power, UserSearch, BarChart4, Flame, Ship, ChartNoAxesCombined, ChartPie, ChartBarStacked, Building, AlertCircle  } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useCurrentDate } from '@/hooks/useCurrentDate';
 import Cookies from 'js-cookie';
@@ -71,6 +71,12 @@ const menuItems: MenuItem[] = [
     label: 'Podział kosztów',
     path: '/costs-summary',
     roles: ['BOARD', 'BRANCH', 'ADMIN']
+  },
+  {
+    IconComponent: AlertCircle,
+    label: 'Zerowe koszty',
+    path: '/zero-costs', // To będzie adres Twojej nowej strony
+    roles: ['BOARD', 'ADMIN'] // Widoczne tylko dla Zarządu i Admina
   },
   {
     IconComponent: TrendingUp,

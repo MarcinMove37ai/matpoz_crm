@@ -1,19 +1,16 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
-import AdminLayout from '@/components/layouts/AdminLayout'
 import AuthProvider from '@/providers/AuthProvider'
 
-const inter = Inter({
-  subsets: ['latin'],
-  display: 'swap',
-  preload: true,
-  fallback: ['system-ui', 'arial']
-})
+// 1. IMPORTUJEMY NASZ PROSTY PROVIDER
+import { ToastProvider } from "@/context/ToastContext"
+
+const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
   title: 'CRM System',
-  description: 'System CRM dla firmy handlowej',
+  description: 'System CRM',
 }
 
 export default function RootLayout({
@@ -25,7 +22,10 @@ export default function RootLayout({
     <html lang="pl">
       <body className={inter.className}>
         <AuthProvider>
-          {children}
+          {/* 2. OTACZAMY TYM APLIKACJĘ. TOASTER JEST JUŻ W ŚRODKU. */}
+          <ToastProvider>
+            {children}
+          </ToastProvider>
         </AuthProvider>
       </body>
     </html>
