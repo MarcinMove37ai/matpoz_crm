@@ -174,6 +174,7 @@ const CostsView = () => {
   const [error, setError] = useState<string | null>(null);
   const [pagination, setPagination] = useState({
     total: 0,
+    total_sum: 0,
     limit: 100,
     offset: 0
   });
@@ -428,15 +429,15 @@ const CostsView = () => {
 
   // Obliczanie sum dla podsumowania
   const costsSummary = useMemo(() => {
-    const totalCostValue = sortedCosts.reduce((sum, cost) => sum + cost.cost_value, 0);
+    const totalCostValue = pagination.total_sum;
     const totalPhValue = sortedCosts.reduce((sum, cost) => sum + cost.cost_ph_value, 0);
 
     return {
       totalCostValue,
       totalPhValue,
-      count: sortedCosts.length
+      count: pagination.total
     };
-  }, [sortedCosts]);
+  }, [sortedCosts, pagination.total_sum, pagination.total]);
 
   // Funkcja do formatowania walut z dokładnością do 2 miejsc po przecinku
   const formatCurrency = (value: number) => {
@@ -617,6 +618,7 @@ const CostsView = () => {
       setCosts(data.costs);
       setPagination({
         total: data.total,
+        total_sum: data.total_sum || 0,
         limit: data.limit,
         offset: data.offset,
       });
@@ -816,7 +818,7 @@ isRangeSearch,
           <div className="flex flex-col">
             <div className="flex flex-col mb-4 gap-4">
               <div className="flex flex-wrap justify-between items-center gap-4">
-                <h2 className="text-2xl font-semibold text-gray-800">Moduł Kosztów</h2>
+                <h2 className="text-2xl font-semibold text-gray-800">Moduł Kosztów xxx</h2>
                 <div className="relative">
                     <Select
                         value={selectedYear?.toString() ?? ''}
@@ -1353,7 +1355,7 @@ isRangeSearch,
                       {sortedCosts.length > 0 && (
                         <TableRow className="bg-gray-100 font-semibold border-t-2 border-gray-300">
                           {!isRepresentative && <TableCell className="text-center">-</TableCell>}
-                          <TableCell className="text-center text-gray-700">SUMA</TableCell>
+                          <TableCell className="text-center text-gray-700">SUMA (total)</TableCell>
                           <TableCell className="text-center text-gray-700">-</TableCell>
                           <TableCell className="text-center text-gray-700">-</TableCell>
                           <TableCell className="text-center text-gray-700">-</TableCell>

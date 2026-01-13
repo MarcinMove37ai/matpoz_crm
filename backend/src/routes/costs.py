@@ -504,6 +504,9 @@ async def get_costs(
         # Pobierz całkowitą liczbę rekordów dla danego filtra
         total_count = query.count()
 
+        # Oblicz sumę cost_value dla wszystkich filtrowanych rekordów
+        total_sum = query.with_entities(func.sum(AllCosts.cost_value)).scalar() or 0
+
         # Zastosuj paginację
         costs = query.order_by(AllCosts.cost_id.desc()).offset(offset).limit(limit).all()
 
@@ -514,6 +517,7 @@ async def get_costs(
 
         return {
             "total": total_count,
+            "total_sum": float(total_sum),
             "costs": costs,
             "offset": offset,
             "limit": limit
