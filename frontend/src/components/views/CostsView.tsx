@@ -146,7 +146,10 @@ const CostsView = () => {
   const [selectedCostType, setSelectedCostType] = useState<string | null>(null);
   const [selectedAuthor, setSelectedAuthor] = useState<string | null>(null);
   const [selectedPH, setSelectedPH] = useState<string | null>(null);
-  const [selectedYear, setSelectedYear] = useState<number | null>(null);
+  const [selectedYear, setSelectedYear] = useState<number | null>(() => {
+    const saved = sessionStorage.getItem('selectedYear');
+    return saved ? parseInt(saved) : null;
+  });
 
   // Stan dla wyszukiwania
   const [searchContractor, setSearchContractor] = useState<string>('');
@@ -255,6 +258,13 @@ const CostsView = () => {
       label: rep
     }))
   ], [initialFilterOptions.representatives]);
+
+  // Zapisz wybrany rok do sessionStorage
+  useEffect(() => {
+    if (selectedYear) {
+      sessionStorage.setItem('selectedYear', selectedYear.toString());
+    }
+  }, [selectedYear]);
 
   // Logika debouncingu
   useEffect(() => {
@@ -542,8 +552,9 @@ const CostsView = () => {
         offset: pagination.offset,
       };
 
-      if (selectedYear) {
-        params.year = selectedYear;
+      const yearToUse = selectedYear || yearsData?.currentYear;
+      if (yearToUse) {
+        params.year = yearToUse;
       }
       if (selectedMonth && selectedMonth !== 'all') {
         params.month = parseInt(selectedMonth);
@@ -646,9 +657,10 @@ const CostsView = () => {
     debouncedContractor,
     debouncedAmount,
     debouncedTolerance,
-isRangeSearch,
+    isRangeSearch,
     debouncedMinAmount,
     debouncedMaxAmount,
+    yearsData?.currentYear,
   ]);
 
   // Handler dla przycisku "Powiel"
@@ -697,7 +709,8 @@ isRangeSearch,
   ]);
 
   useEffect(() => {
-    if (!selectedYear && yearsData?.currentYear) {
+    const savedYear = sessionStorage.getItem('selectedYear');
+    if (!selectedYear && !savedYear && yearsData?.currentYear) {
       setSelectedYear(yearsData.currentYear);
     }
   }, [selectedYear, yearsData]);
