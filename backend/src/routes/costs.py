@@ -6,7 +6,7 @@ from datetime import datetime
 import logging
 from typing import List, Optional
 
-from models.transaction import AllCosts, ConfigCurrentDate, CostKind
+from models.transaction import AllCosts, ConfigCurrentDate, CostKind, CostAuditLog
 from database import get_db
 from pydantic import BaseModel
 
@@ -30,6 +30,7 @@ class CostCreate(BaseModel):
     cost_branch: str
     branch_payout: Optional[float] = None
     rep_payout: Optional[float] = None
+    current_user: Optional[str] = None  # Dodane dla audit log
 
     class Config:
         from_attributes = True
@@ -175,8 +176,52 @@ async def update_cost(cost_id: int, cost: CostCreate, db: Session = Depends(get_
                 detail="Podany rodzaj kosztu nie istnieje"
             )
 
-        # Aktualizuj dane kosztu
-        for key, value in cost.model_dump().items():
+        # --- AUDIT LOG: Zapisz zmiany ---
+        new_values = cost.model_dump()
+        current_user = new_values.pop('current_user', None)  # Wyciągnij current_user
+
+        # TYLKO pola edytowalne przez użytkownika w formularzu
+        editable_fields = {
+            'cost_contrahent',  # Nazwa kontrahenta
+            'cost_nip',  # NIP
+            'cost_doc_no',  # Numer faktury
+            'cost_value',  # Kwota
+            'cost_mo',  # Miesiąc
+            'cost_year',  # Rok
+            'cost_kind',  # Rodzaj kosztu
+            'cost_4what',  # Za co?
+            'cost_own',  # Właściciel kosztu
+            'cost_branch',  # Oddział
+            'cost_ph'  # Przedstawiciel
+        }
+
+        changes = {}
+
+        for key, new_value in new_values.items():
+            # Rejestruj TYLKO pola edytowalne
+            if key not in editable_fields:
+                continue
+
+            old_value = getattr(db_cost, key, None)
+            if old_value != new_value:
+                changes[key] = {
+                    "old": str(old_value) if old_value is not None else None,
+                    "new": str(new_value) if new_value is not None else None
+                }
+
+        # Tylko jeśli są zmiany
+        if changes:
+            audit_entry = CostAuditLog(
+                event_type='UPDATE',
+                cost_id=cost_id,
+                user_name=current_user or "Nieznany użytkownik",
+                changes=changes
+            )
+            db.add(audit_entry)
+        # --- KONIEC AUDIT LOG ---
+
+        # Aktualizuj dane kosztu (bez current_user)
+        for key, value in new_values.items():
             setattr(db_cost, key, value)
 
         db.commit()
@@ -419,12 +464,16 @@ async def create_cost(cost: CostCreate, db: Session = Depends(get_db)):
         if not config:
             raise HTTPException(status_code=404, detail="Nie znaleziono konfiguracji daty")
 
+        # Usuń current_user z danych (nie jest polem w AllCosts)
+        cost_data = cost.model_dump()
+        cost_data.pop('current_user', None)
+
         # Utwórz nowy rekord kosztu
         db_cost = AllCosts(
             cur_day=config.day_value,
             cur_mo=config.month_value,
             cur_yr=config.year_value,
-            **cost.model_dump()
+            **cost_data
         )
 
         db.add(db_cost)
@@ -724,7 +773,11 @@ async def get_cost_by_id(cost_id: int, db: Session = Depends(get_db)):
 
 
 @router.delete("/costs/{cost_id}")
-async def delete_cost(cost_id: int, db: Session = Depends(get_db)):
+async def delete_cost(
+        cost_id: int,
+        current_user: str = Query(..., description="Nazwa użytkownika usuwającego koszt"),
+        db: Session = Depends(get_db)
+):
     """
     Usuwa koszt o podanym ID z bazy danych.
     """
@@ -732,6 +785,32 @@ async def delete_cost(cost_id: int, db: Session = Depends(get_db)):
         cost = db.query(AllCosts).filter(AllCosts.cost_id == cost_id).first()
         if not cost:
             raise HTTPException(status_code=404, detail="Nie znaleziono kosztu o podanym ID")
+
+        # --- AUDIT LOG: Zarejestruj usunięcie ze stanem kosztu ---
+        # Zapisz wszystkieważne pola kosztu przed usunięciem
+        deleted_cost_snapshot = {
+            "cost_contrahent": str(cost.cost_contrahent),
+            "cost_nip": str(cost.cost_nip),
+            "cost_doc_no": str(cost.cost_doc_no),
+            "cost_value": str(cost.cost_value),
+            "cost_mo": str(cost.cost_mo),
+            "cost_year": str(cost.cost_year),
+            "cost_kind": str(cost.cost_kind),
+            "cost_4what": str(cost.cost_4what),
+            "cost_own": str(cost.cost_own),
+            "cost_branch": str(cost.cost_branch),
+            "cost_ph": str(cost.cost_ph) if cost.cost_ph else None,
+            "cost_author": str(cost.cost_author)
+        }
+
+        audit_entry = CostAuditLog(
+            event_type='DELETE',
+            cost_id=cost_id,
+            user_name=current_user,
+            changes=deleted_cost_snapshot  # Zapisz stan kosztu w momencie usunięcia
+        )
+        db.add(audit_entry)
+        # --- KONIEC AUDIT LOG ---
 
         db.delete(cost)
         db.commit()

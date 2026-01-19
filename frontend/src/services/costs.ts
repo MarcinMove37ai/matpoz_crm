@@ -65,14 +65,17 @@ class CostsService {
   }
 
   // Nowa metoda do aktualizacji kosztu
-  async updateCost(costId: number, costData: CostData) {
+  async updateCost(costId: number, costData: CostData, userName: string) {
     try {
       const response = await fetch(`${this.apiUrl}/${costId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(costData),
+        body: JSON.stringify({
+          ...costData,
+          current_user: userName  // Dodajemy info o zalogowanym użytkowniku
+        }),
       });
 
       if (!response.ok) {
@@ -90,9 +93,13 @@ class CostsService {
   }
 
   // Nowa metoda do usuwania kosztu
-  async deleteCost(costId: number) {
+  async deleteCost(costId: number, userName: string) {
     try {
-      const response = await fetch(`${this.apiUrl}/${costId}`, {
+      const queryParams = new URLSearchParams({
+        current_user: userName  // Przekazujemy info o zalogowanym użytkowniku
+      });
+
+      const response = await fetch(`${this.apiUrl}/${costId}?${queryParams.toString()}`, {
         method: 'DELETE',
       });
 

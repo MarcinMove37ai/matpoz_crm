@@ -776,8 +776,9 @@ const CostsView = () => {
       );
 
       if (confirmed) {
+        const currentUserName = user?.fullName || user?.username || 'Nieznany użytkownik';
         for (const costId of costIds) {
-          await costsService.deleteCost(costId);
+          await costsService.deleteCost(costId, currentUserName);
         }
         fetchCosts();
         setSelectedCosts([]);

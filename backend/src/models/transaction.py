@@ -1,4 +1,5 @@
-from sqlalchemy import Column, Integer, String, DateTime, Numeric, func, cast, or_, Date, Text
+from sqlalchemy import Column, Integer, String, DateTime, Numeric, func, cast, or_, Date, Text, CheckConstraint
+from sqlalchemy.dialects.postgresql import JSON
 from sqlalchemy.ext.hybrid import hybrid_property
 from database import Base
 
@@ -115,6 +116,27 @@ class AllCosts(Base):
 
     def __repr__(self):
         return f"<AllCosts(cost_id={self.cost_id}, cost_contrahent='{self.cost_contrahent}', cost_doc_no='{self.cost_doc_no}')>"
+
+
+class CostAuditLog(Base):
+    """
+    Model dla tabeli cost_audit_log - rejestr zmian i usunięć kosztów
+    """
+    __tablename__ = "cost_audit_log"
+
+    id = Column(Integer, primary_key=True, index=True)
+    event_type = Column(String(10), nullable=False)  # 'DELETE' lub 'UPDATE'
+    cost_id = Column(Integer, nullable=False, index=True)
+    user_name = Column(String(255), nullable=False)
+    event_timestamp = Column(DateTime, server_default=func.now(), nullable=False)
+    changes = Column(JSON, nullable=True)  # Tylko dla UPDATE
+
+    __table_args__ = (
+        CheckConstraint("event_type IN ('DELETE', 'UPDATE')", name='check_event_type'),
+    )
+
+    def __repr__(self):
+        return f"<CostAuditLog(id={self.id}, event_type='{self.event_type}', cost_id={self.cost_id}, user='{self.user_name}')>"
 class AggregatedDataSums(Base):
     __tablename__ = "aggregated_data_sums"
 

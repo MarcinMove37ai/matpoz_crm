@@ -520,7 +520,8 @@ const EditCostDialog: React.FC<EditCostDialogProps> = ({
           author: user?.fullName || user?.username || cost.cost_author
         });
 
-        await costsService.updateCost(cost.cost_id, costData);
+        const currentUserName = user?.fullName || user?.username || cost.cost_author;
+        await costsService.updateCost(cost.cost_id, costData, currentUserName);
 
         setNotification({
           type: 'success',
