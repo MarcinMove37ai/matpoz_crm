@@ -54,6 +54,7 @@ const branchMapping: Record<string, string> = {
 const getBranchDisplayName = (branch: string): string => {
   if (branch === 'HQ') return 'Centrala';
   if (branch === 'STH') return 'Serwis';
+  if (branch === 'Private') return 'Prywatny';
   return branch;
 };
 
@@ -1347,6 +1348,7 @@ const CostsView = () => {
                                   cost.cost_branch === 'BHP' ? 'bg-yellow-100 text-yellow-800' :
                                   cost.cost_branch === 'Pcim' ? 'bg-green-100 text-green-800' :
                                   cost.cost_branch === 'Rzgów' ? 'bg-blue-100 text-blue-800' :
+                                  cost.cost_branch === 'Private' ? 'bg-orange-100 text-orange-800' :
                                   'bg-blue-100 text-blue-800'}`}>
                                 {getBranchDisplayName(cost.cost_branch)} {/* Zastosuj funkcję mapującą */}
                               </span>

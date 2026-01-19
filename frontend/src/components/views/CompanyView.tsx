@@ -50,6 +50,8 @@ export type CompanyDataPackage = {
     aggregatedData: ProfitData;
     headquartersCosts: ProfitCategoryData;
     totalCosts: ProfitCategoryData;
+    privateCosts: ProfitCategoryData;
+    netProfitTotal: ProfitCategoryData;
 };
 
 export type HistoricalProfitData = {
@@ -202,7 +204,48 @@ const fetchAndAggregateCompanyData = async (year: number, month?: number): Promi
   };
   calculateTotals(aggregatedData.netProfit);
 
-  return { aggregatedData, headquartersCosts, totalCosts };
+  // === POBIERANIE KOSZTÓW PRYWATNYCH ===
+  let totalPrivateCostValue = 0;
+  try {
+      const privateCostsUrl = `/api/costs?year=${year}${month ? `&month=${month}` : ''}&branch=Private&limit=1000`;
+      const privateCostsResponse = await fetch(privateCostsUrl);
+      if (privateCostsResponse.ok) {
+          const privateData = await privateCostsResponse.json();
+          if (privateData.costs && Array.isArray(privateData.costs)) {
+              totalPrivateCostValue = privateData.costs.reduce((sum: number, cost: { cost_value: number }) => {
+                  return sum + (cost.cost_value || 0);
+              }, 0);
+          }
+      }
+  } catch (error) {
+      console.error("Błąd podczas pobierania kosztów prywatnych:", error);
+      totalPrivateCostValue = 0;
+  }
+
+  const privateCosts: ProfitCategoryData = {
+      firm: totalPrivateCostValue,
+      branches: 0,
+      ph: 0,
+      fund: 0,
+      total: totalPrivateCostValue,
+  };
+
+  // === OBLICZENIE ZYSKU NETTO TOTAL (po odjęciu kosztów prywatnych) ===
+  const netProfitTotal: ProfitCategoryData = {
+      firm: aggregatedData.netProfit.firm - privateCosts.firm,
+      branches: aggregatedData.netProfit.branches,
+      ph: aggregatedData.netProfit.ph,
+      fund: 0,
+      total: 0,
+      firmPaid: (aggregatedData.netProfit.firmPaid || 0) - privateCosts.firm,
+      branchesPaid: aggregatedData.netProfit.branchesPaid || 0,
+      phPaid: aggregatedData.netProfit.phPaid || 0,
+      fundPaid: 0,
+      totalPaid: 0,
+  };
+  calculateTotals(netProfitTotal);
+
+  return { aggregatedData, headquartersCosts, totalCosts, privateCosts, netProfitTotal };
 };
 
 // --- GŁÓWNY KOMPONENT WIDOKU (ZAKTUALIZOWANY) ---
@@ -364,7 +407,7 @@ const MonthlyDataBlock: React.FC<{ dataPackage: CompanyDataPackage, year: number
 
 // NOWY komponent pomocniczy do renderowania wierszy, aby uniknąć powtórzeń
 const DataRows: React.FC<{ dataPackage: CompanyDataPackage }> = ({ dataPackage }) => {
-    const { aggregatedData, headquartersCosts, totalCosts } = dataPackage;
+    const { aggregatedData, headquartersCosts, totalCosts, privateCosts, netProfitTotal } = dataPackage;
     return (
         <div>
             {/* Wiersz Zysk CN */}
@@ -399,13 +442,29 @@ const DataRows: React.FC<{ dataPackage: CompanyDataPackage }> = ({ dataPackage }
                 <div className="hidden sm:block text-center"><span className="text-sm text-red-700">{formatCurrency(totalCosts.ph)}</span></div>
                 <div className="text-center"><span className="text-sm text-red-700">{formatCurrency(totalCosts.total)}</span></div>
             </div>
-            {/* Wiersz Zysk Netto */}
+            {/* Wiersz Zysk Netto Firma */}
             <div className="grid grid-cols-3 sm:grid-cols-5 gap-4 items-center py-1 bg-blue-100 rounded-md mt-1">
-                <div className="ml-2"><span className="text-xs font-bold text-gray-700">Zysk netto</span></div>
+                <div className="ml-2"><span className="text-xs font-bold text-gray-700">Zysk netto Firma</span></div>
                 <div className="text-center"><span className="text-sm font-bold text-blue-600">{formatCurrency(aggregatedData.netProfit.firm)}</span><div className="text-xs text-blue-400">({formatCurrency(aggregatedData.netProfit.firmPaid || 0)})</div></div>
                 <div className="hidden sm:block text-center"><span className="text-sm font-bold text-blue-600">{formatCurrency(aggregatedData.netProfit.branches)}</span><div className="text-xs text-blue-400">({formatCurrency(aggregatedData.netProfit.branchesPaid || 0)})</div></div>
                 <div className="hidden sm:block text-center"><span className="text-sm font-bold text-blue-600">{formatCurrency(aggregatedData.netProfit.ph)}</span><div className="text-xs text-blue-400">({formatCurrency(aggregatedData.netProfit.phPaid || 0)})</div></div>
                 <div className="text-center"><span className="text-sm font-bold text-blue-600">{formatCurrency(aggregatedData.netProfit.total)}</span><div className="text-xs text-blue-400">({formatCurrency(aggregatedData.netProfit.totalPaid || 0)})</div></div>
+            </div>
+            {/* NOWY Wiersz Koszty prywatne */}
+            <div className="grid grid-cols-3 sm:grid-cols-5 gap-4 items-center py-1 border-t border-gray-200 mt-1">
+                <div className="ml-2"><span className="text-xs font-medium text-gray-700">Koszty prywatne</span></div>
+                <div className="text-center"><span className="text-sm font-medium text-orange-600">{formatCurrency(privateCosts.firm)}</span></div>
+                <div className="hidden sm:block text-center"><span className="text-sm font-medium text-red-600">-</span></div>
+                <div className="hidden sm:block text-center"><span className="text-sm font-medium text-red-600">-</span></div>
+                <div className="text-center"><span className="text-sm font-medium text-red-600">-</span></div>
+            </div>
+            {/* NOWY Wiersz Zysk netto total */}
+            <div className="grid grid-cols-3 sm:grid-cols-5 gap-4 items-center py-1 bg-blue-100 rounded-md mt-1">
+                <div className="ml-2"><span className="text-xs font-bold text-gray-700">Zysk netto Total</span></div>
+                <div className="text-center"><span className="text-sm font-bold text-blue-600">{formatCurrency(netProfitTotal.firm)}</span><div className="text-xs text-blue-400">({formatCurrency(netProfitTotal.firmPaid || 0)})</div></div>
+                <div className="hidden sm:block text-center"><span className="text-sm font-bold text-blue-600">-</span></div>
+                <div className="hidden sm:block text-center"><span className="text-sm font-bold text-blue-600">-</span></div>
+                <div className="text-center"><span className="text-sm font-bold text-blue-600">-</span></div>
             </div>
         </div>
     );

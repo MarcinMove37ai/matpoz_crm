@@ -78,6 +78,12 @@ const EditCostDialog: React.FC<EditCostDialogProps> = ({
   const [representativesList, setRepresentativesList] = useState<Array<{ id: string, name: string }>>([]);
   const [isCommissionPayment, setIsCommissionPayment] = useState(false);
   const [previousDescription, setPreviousDescription] = useState('');
+  const [isPrivateCost, setIsPrivateCost] = useState(false);
+  const [previousPrivateState, setPreviousPrivateState] = useState({
+    costOwner: '',
+    department: '',
+    representative: ''
+  });
   const normalizedBranch = React.useMemo(() => normalizeBranchName(userBranch || ''), [userBranch]);
 
   const getAvailableDepartments = () => {
@@ -124,11 +130,11 @@ const EditCostDialog: React.FC<EditCostDialogProps> = ({
 
   const costOwners = [
     "Wspólny",
-    "Oddział",
+     "Oddział",
     "Centrala",
-    "Przedstawiciel"
+    "Przedstawiciel",
+    "Prywatny"
   ];
-
   // Ograniczona lista właścicieli kosztu dla wypłaty prowizji
   const commissionCostOwners = [
     "Oddział",
@@ -145,7 +151,8 @@ const EditCostDialog: React.FC<EditCostDialogProps> = ({
     { value: "Myślibórz", label: "Myślibórz" },
     { value: "MG", label: "Interent" },
     { value: "STH", label: "Serwis" },
-    { value: "BHP", label: "BHP" }
+    { value: "BHP", label: "BHP" },
+    { value: "Private", label: "Prywatny" }
   ];
 
     const handleInputChange = (field: string, value: string) => {
@@ -243,6 +250,51 @@ const EditCostDialog: React.FC<EditCostDialogProps> = ({
     }
   };
 
+  // Obsługa zmiany checkboxa kosztu prywatnego
+  const handlePrivateCostChange = (checked: boolean) => {
+    setIsPrivateCost(checked);
+
+    if (checked) {
+      // Zapisz poprzedni stan
+      setPreviousPrivateState({
+        costOwner: formData.costOwner,
+        department: formData.department,
+        representative: formData.representative
+      });
+
+      // Ustaw wartości dla kosztu prywatnego
+      setFormData(prev => ({
+        ...prev,
+        costOwner: 'Prywatny',
+        department: 'Private',
+        representative: 'none'
+      }));
+
+      // Usuń błędy dla tych pól
+      setErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors.costOwner;
+        delete newErrors.department;
+        delete newErrors.representative;
+        return newErrors;
+      });
+    } else {
+      // Przywróć poprzedni stan
+      setFormData(prev => ({
+        ...prev,
+        costOwner: previousPrivateState.costOwner,
+        department: previousPrivateState.department,
+        representative: previousPrivateState.representative
+      }));
+
+      setPreviousPrivateState({
+        costOwner: '',
+        department: '',
+        representative: ''
+      });
+    }
+  };
+
   // Aktualizacja formularza po otwarciu dialogu i otrzymaniu danych kosztu
   useEffect(() => {
     if (isOpen && cost) {
@@ -252,6 +304,9 @@ const EditCostDialog: React.FC<EditCostDialogProps> = ({
 
       const isCommission = cost.cost_kind === 'Wypłata';
       setIsCommissionPayment(isCommission);
+
+      const isPrivate = cost.cost_own === 'Prywatny';
+      setIsPrivateCost(isPrivate);
 
       // Jeśli to wypłata prowizji, zapisz oryginalną wartość jako poprzednią
       if (isCommission && cost.cost_4what !== 'Wypłata prowizji') {
@@ -432,7 +487,15 @@ const EditCostDialog: React.FC<EditCostDialogProps> = ({
 
   // Określ które opcje właściciela kosztu wyświetlać
   const getAvailableCostOwners = () => {
-    return isCommissionPayment ? commissionCostOwners : costOwners;
+    if (isCommissionPayment) {
+      return commissionCostOwners;
+    }
+    // Pokaż "Prywatny" tylko gdy checkbox jest zaznaczony
+    if (isPrivateCost) {
+      return costOwners;
+    }
+    // W przeciwnym razie ukryj "Prywatny"
+    return costOwners.filter(owner => owner !== 'Prywatny');
   };
 
   return (
@@ -591,13 +654,14 @@ const EditCostDialog: React.FC<EditCostDialogProps> = ({
           {/* Sekcja 4: Przypisanie kosztu */}
           <div>
             <h3 className="text-sm font-medium text-gray-600 mb-3">Przypisanie kosztu</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className={`grid grid-cols-1 md:grid-cols-3 gap-4 ${isPrivateCost ? 'bg-orange-50 border border-orange-200 rounded-lg p-4' : ''}`}>
               <div className="flex flex-col">
                 <ScrollableSelect
                   value={formData.costOwner}
                   onValueChange={(value) => handleInputChange('costOwner', value)}
                   placeholder="Właściciel kosztu"
-                  disabled={formData.department === 'HQ'}
+                  disabled={formData.department === 'HQ' || isPrivateCost}
+                  className={isPrivateCost ? 'bg-purple-50 border-purple-300' : ''}
                   items={getAvailableCostOwners().map(owner => ({
                     value: owner,
                     label: owner
@@ -613,7 +677,8 @@ const EditCostDialog: React.FC<EditCostDialogProps> = ({
                   value={formData.department}
                   onValueChange={(value) => handleDepartmentChange(value)}
                   placeholder="Oddział"
-                  disabled={userRole === 'BRANCH' || userRole === 'STAFF'}
+                  disabled={userRole === 'BRANCH' || userRole === 'STAFF' || isPrivateCost}
+                  className={isPrivateCost ? 'bg-purple-50 border-purple-300' : ''}
                   items={getAvailableDepartments().map(dept => ({
                     value: dept.value,
                     label: dept.label
@@ -630,7 +695,8 @@ const EditCostDialog: React.FC<EditCostDialogProps> = ({
                   value={formData.representative}
                   onValueChange={(value) => handleInputChange('representative', value)}
                   placeholder="Przedstawiciel"
-                  disabled={isRepresentativeFieldDisabled() || formData.department === 'HQ'}
+                  disabled={isRepresentativeFieldDisabled() || formData.department === 'HQ' || isPrivateCost}
+                  className={isPrivateCost ? 'bg-purple-50 border-purple-300' : ''}
                   items={[
                     ...(shouldShowNoRepresentative() ? [{ value: 'none', label: 'Brak przedstawiciela' }] : []),
                     ...representativesList.map(rep => ({
@@ -649,19 +715,37 @@ const EditCostDialog: React.FC<EditCostDialogProps> = ({
 
           {/* Przyciski akcji */}
           <div className="flex justify-between items-center pt-4 border-t border-gray-200">
-            {/* Checkbox wypłaty prowizji - lewy dolny róg */}
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="commission-payment"
-                checked={isCommissionPayment}
-                onCheckedChange={handleCommissionPaymentChange}
-              />
-              <label
-                htmlFor="commission-payment"
-                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-gray-700"
-              >
-                Wypłata prowizji
-              </label>
+            {/* Checkboxy - lewy dolny róg */}
+            <div className="flex items-center space-x-6">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="commission-payment"
+                  checked={isCommissionPayment}
+                  onCheckedChange={handleCommissionPaymentChange}
+                />
+                <label
+                  htmlFor="commission-payment"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-gray-700"
+                >
+                  Wypłata prowizji
+                </label>
+              </div>
+
+              {userRole === 'ADMIN' && (
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="private-cost"
+                    checked={isPrivateCost}
+                    onCheckedChange={handlePrivateCostChange}
+                  />
+                  <label
+                    htmlFor="private-cost"
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-gray-700"
+                  >
+                    Koszt prywatny
+                  </label>
+                </div>
+              )}
             </div>
 
             {/* Przyciski - prawy dolny róg */}
