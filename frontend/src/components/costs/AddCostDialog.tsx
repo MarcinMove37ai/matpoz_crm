@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import ScrollableSelect from "@/components/ui/ScrollableSelect";
 import SearchableSelect from "@/components/ui/SearchableSelect";
 import { mapFormDataToCostData } from '@/mappers/costMapper';
@@ -6,6 +6,7 @@ import { costsService } from '@/services/costs';
 import { CostData } from '@/types/costs';
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useAuth } from '@/hooks/useAuth';
+import { useCurrentDate } from '@/hooks/useCurrentDate';
 import {
   Dialog,
   DialogContent,
@@ -91,6 +92,7 @@ const AddCostDialog: React.FC<AddCostDialogProps> = ({
   onOpenChange: externalOnOpenChange
 }) => {
   const { user } = useAuth();
+  const { date } = useCurrentDate();
   const [internalOpen, setInternalOpen] = useState(false);
   const [costTypes, setCostTypes] = useState<Array<{ id: string, kind: string }>>([]);
   const [representativesList, setRepresentativesList] = useState<Array<{ id: string, name: string }>>([]);
@@ -135,20 +137,58 @@ const AddCostDialog: React.FC<AddCostDialogProps> = ({
     message: string;
   } | null>(null);
 
-  const months = [
-    { value: "1", label: "Styczeń" },
-    { value: "2", label: "Luty" },
-    { value: "3", label: "Marzec" },
-    { value: "4", label: "Kwiecień" },
-    { value: "5", label: "Maj" },
-    { value: "6", label: "Czerwiec" },
-    { value: "7", label: "Lipiec" },
-    { value: "8", label: "Sierpień" },
-    { value: "9", label: "Wrzesień" },
-    { value: "10", label: "Październik" },
-    { value: "11", label: "Listopad" },
-    { value: "12", label: "Grudzień" },
-  ];
+  // Generowanie dostępnych miesięcy na podstawie roli i daty
+  const months = useMemo(() => {
+    const monthNames = [
+      "Styczeń", "Luty", "Marzec", "Kwiecień", "Maj", "Czerwiec",
+      "Lipiec", "Sierpień", "Wrzesień", "Październik", "Listopad", "Grudzień"
+    ];
+
+    // Admin i BASIA widzą wszystkie miesiące (bez roku w etykiecie)
+    if (userRole === 'ADMIN' || userRole === 'BASIA') {
+      return monthNames.map((name, index) => ({
+        value: (index + 1).toString(),
+        label: name
+      }));
+    }
+
+    // Dla pozostałych użytkowników - ograniczenie
+    if (!date) {
+      return []; // Jeśli data się nie załadowała, zwróć pustą tablicę
+    }
+
+    // Użyj bezpośrednio właściwości z DateResponse
+    const currentDay = date.day;
+    const currentMonth = date.month;
+    const currentYear = date.year;
+
+    const availableMonths = [];
+
+    // Dzień 1-10: bieżący + poprzedni miesiąc
+    if (currentDay <= 10) {
+      // Poprzedni miesiąc
+      const prevMonth = currentMonth === 1 ? 12 : currentMonth - 1;
+      const prevYear = currentMonth === 1 ? currentYear - 1 : currentYear;
+      availableMonths.push({
+        value: prevMonth.toString(),
+        label: `${monthNames[prevMonth - 1]} ${prevYear}`
+      });
+
+      // Bieżący miesiąc
+      availableMonths.push({
+        value: currentMonth.toString(),
+        label: `${monthNames[currentMonth - 1]} ${currentYear}`
+      });
+    } else {
+      // Dzień 11+: tylko bieżący miesiąc
+      availableMonths.push({
+        value: currentMonth.toString(),
+        label: `${monthNames[currentMonth - 1]} ${currentYear}`
+      });
+    }
+
+    return availableMonths;
+  }, [date, userRole]);
 
   const costOwners = [
     "Wspólny",
@@ -454,9 +494,31 @@ const AddCostDialog: React.FC<AddCostDialogProps> = ({
 
     if (validateForm()) {
       try {
+        // Oblicz właściwy rok na podstawie wybranego miesiąca
+        let yearToSave: number;
+
+        // Admin i BASIA mają własne pole roku - używamy go bezpośrednio
+        if (userRole === 'ADMIN' || userRole === 'BASIA') {
+          yearToSave = parseInt(formData.year) || selectedYear || new Date().getFullYear();
+        } else {
+          // Dla pozostałych użytkowników: automatyczna logika
+          yearToSave = selectedYear || new Date().getFullYear();
+
+          if (date) {
+            // Użyj bezpośrednio właściwości z DateResponse
+            const currentMonth = date.month;
+            const selectedMonthNum = parseInt(formData.month);
+
+            // Jeśli obecny miesiąc < wybrany miesiąc, to wybrano poprzedni miesiąc z poprzedniego roku
+            if (currentMonth < selectedMonthNum) {
+              yearToSave = yearToSave - 1;
+            }
+          }
+        }
+
         const costData = mapFormDataToCostData({
           ...formData,
-          year: selectedYear || new Date().getFullYear(),
+          year: yearToSave,
           author: user?.fullName || user?.username || ''
         });
 
@@ -655,7 +717,7 @@ const AddCostDialog: React.FC<AddCostDialogProps> = ({
           {/* Sekcja 2: Dane faktury */}
           <div>
             <h3 className="text-sm font-medium text-gray-600 mb-3">Dane faktury</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className={`grid grid-cols-1 gap-4 ${(userRole === 'ADMIN' || userRole === 'BASIA') ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}>
               <div className="flex flex-col">
                 <Input
                   id="invoiceNumber"
@@ -700,6 +762,26 @@ const AddCostDialog: React.FC<AddCostDialogProps> = ({
                     <span className="text-red-500 text-sm mt-1">{errors.month}</span>
                   )}
                 </div>
+
+              {/* Pole roku - tylko dla Admin i BASIA */}
+              {(userRole === 'ADMIN' || userRole === 'BASIA') && (
+                <div className="flex flex-col">
+                  <SearchableSelect
+                    value={formData.year}
+                    onValueChange={(value) => handleInputChange('year', value)}
+                    placeholder="Wybierz rok"
+                    expandUpward={false}
+                    items={[
+                      { value: new Date().getFullYear().toString(), label: new Date().getFullYear().toString() },
+                      { value: (new Date().getFullYear() - 1).toString(), label: (new Date().getFullYear() - 1).toString() }
+                    ]}
+                    emptyMessage="Nie znaleziono roku"
+                  />
+                  {errors.year && (
+                    <span className="text-red-500 text-sm mt-1">{errors.year}</span>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
