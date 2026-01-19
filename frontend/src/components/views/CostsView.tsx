@@ -421,8 +421,8 @@ const CostsView = () => {
     const costMonth = cost.cost_mo;
     const costYear = cost.cost_year;
 
-    // Dzień 1-10: można edytować bieżący i poprzedni miesiąc
-    if (currentDay <= 10) {
+    // Dzień 1-20: można edytować bieżący i poprzedni miesiąc
+    if (currentDay <= 20) {
       // Bieżący miesiąc i rok
       if (costMonth === currentMonth && costYear === currentYear) {
         return true;
@@ -438,7 +438,7 @@ const CostsView = () => {
 
       return false;
     } else {
-      // Dzień 11+: tylko bieżący miesiąc
+      // Dzień 21+: tylko bieżący miesiąc
       return costMonth === currentMonth && costYear === currentYear;
     }
   };
@@ -899,7 +899,7 @@ const CostsView = () => {
           <div className="flex flex-col">
             <div className="flex flex-col mb-4 gap-4">
               <div className="flex flex-wrap justify-between items-center gap-4">
-                <h2 className="text-2xl font-semibold text-gray-800">Moduł Kosztów xxx</h2>
+                <h2 className="text-2xl font-semibold text-gray-800">Moduł Kosztów</h2>
                 <div className="relative">
                     <Select
                         value={selectedYear?.toString() ?? ''}
@@ -1356,14 +1356,22 @@ const CostsView = () => {
                         >
                           {!isRepresentative && (
                             <TableCell className="text-center">
-                              <Checkbox
-                                checked={selectedCosts.includes(cost.cost_id)}
-                                onCheckedChange={(checked) =>
-                                  handleSelectCost(cost.cost_id, checked === true)
-                                }
-                                disabled={!canEditCost(cost)}
-                                aria-label={`Zaznacz koszt ${cost.cost_id}`}
-                              />
+                              <div className="relative group inline-block">
+                                <Checkbox
+                                  checked={selectedCosts.includes(cost.cost_id)}
+                                  onCheckedChange={(checked) =>
+                                    handleSelectCost(cost.cost_id, checked === true)
+                                  }
+                                  disabled={!canEditCost(cost)}
+                                  aria-label={`Zaznacz koszt ${cost.cost_id}`}
+                                />
+                                {!canEditCost(cost) && (
+                                  <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg whitespace-nowrap opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 pointer-events-none z-[9999]">
+                                    Nie możesz już edytować ani usunąć tego kosztu
+                                    <div className="absolute right-full top-1/2 -translate-y-1/2 w-0 h-0 border-t-4 border-b-4 border-r-4 border-t-transparent border-b-transparent border-r-gray-900"></div>
+                                  </div>
+                                )}
+                              </div>
                             </TableCell>
                           )}
                           <TableCell className="font-medium text-gray-800 text-center">

@@ -142,8 +142,8 @@ const EditCostDialog: React.FC<EditCostDialogProps> = ({
 
     const availableMonths = [];
 
-    // Dzień 1-10: bieżący + poprzedni miesiąc
-    if (currentDay <= 10) {
+    // Dzień 1-20: bieżący + poprzedni miesiąc
+    if (currentDay <= 20) {
       // Poprzedni miesiąc
       const prevMonth = currentMonth === 1 ? 12 : currentMonth - 1;
       const prevYear = currentMonth === 1 ? currentYear - 1 : currentYear;
@@ -158,7 +158,7 @@ const EditCostDialog: React.FC<EditCostDialogProps> = ({
         label: `${monthNames[currentMonth - 1]} ${currentYear}`
       });
     } else {
-      // Dzień 11+: tylko bieżący miesiąc
+      // Dzień 21+: tylko bieżący miesiąc
       availableMonths.push({
         value: currentMonth.toString(),
         label: `${monthNames[currentMonth - 1]} ${currentYear}`
