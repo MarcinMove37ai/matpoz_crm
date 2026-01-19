@@ -402,6 +402,47 @@ const CostsView = () => {
       });
   }, [costs, sortConfig, userRole]);
 
+  // Funkcja sprawdzająca czy użytkownik może edytować/usuwać koszt
+  const canEditCost = (cost: Cost): boolean => {
+    // Admin i BASIA mogą edytować wszystko
+    if (userRole === 'ADMIN' || userRole === 'BASIA') {
+      return true;
+    }
+
+    // Jeśli nie mamy daty, blokujemy edycję (bezpieczeństwo)
+    if (!date) {
+      return false;
+    }
+
+    const currentDay = date.day;
+    const currentMonth = date.month;
+    const currentYear = date.year;
+
+    const costMonth = cost.cost_mo;
+    const costYear = cost.cost_year;
+
+    // Dzień 1-10: można edytować bieżący i poprzedni miesiąc
+    if (currentDay <= 10) {
+      // Bieżący miesiąc i rok
+      if (costMonth === currentMonth && costYear === currentYear) {
+        return true;
+      }
+
+      // Poprzedni miesiąc
+      const prevMonth = currentMonth === 1 ? 12 : currentMonth - 1;
+      const prevYear = currentMonth === 1 ? currentYear - 1 : currentYear;
+
+      if (costMonth === prevMonth && costYear === prevYear) {
+        return true;
+      }
+
+      return false;
+    } else {
+      // Dzień 11+: tylko bieżący miesiąc
+      return costMonth === currentMonth && costYear === currentYear;
+    }
+  };
+
   // Komponent ikony sortowania
   const SortIcon = ({ column }: { column: SortColumn }) => {
     if (sortConfig.column !== column) {
@@ -749,7 +790,16 @@ const CostsView = () => {
 
   const handleSelectAllCosts = (checked: boolean) => {
     if (checked) {
-      setSelectedCosts(sortedCosts.map(cost => cost.cost_id));
+      // Admin i BASIA mogą zaznaczyć wszystkie koszty
+      if (userRole === 'ADMIN' || userRole === 'BASIA') {
+        setSelectedCosts(sortedCosts.map(cost => cost.cost_id));
+      } else {
+        // Pozostali użytkownicy mogą zaznaczyć tylko koszty, które można edytować
+        const editableCosts = sortedCosts
+          .filter(cost => canEditCost(cost))
+          .map(cost => cost.cost_id);
+        setSelectedCosts(editableCosts);
+      }
     } else {
       setSelectedCosts([]);
     }
@@ -788,7 +838,23 @@ const CostsView = () => {
   const canEdit = isAdmin || isBranch || isStaff || isBasia;
   const canAdd = isAdmin || isBranch || isStaff || isBasia;
   const canDelete = isAdmin || isBranch || isStaff || isBasia;
-  const allCostsSelected = sortedCosts.length > 0 && selectedCosts.length === sortedCosts.length && !isRepresentative;
+
+  // Oblicz allCostsSelected z uwzględnieniem ograniczeń czasowych
+  const allCostsSelected = useMemo(() => {
+    if (isRepresentative || sortedCosts.length === 0) {
+      return false;
+    }
+
+    // Admin i BASIA - sprawdzamy czy wszystkie koszty są zaznaczone
+    if (userRole === 'ADMIN' || userRole === 'BASIA') {
+      return selectedCosts.length === sortedCosts.length;
+    }
+
+    // Pozostali użytkownicy - sprawdzamy czy wszystkie EDYTOWALNE koszty są zaznaczone
+    const editableCosts = sortedCosts.filter(cost => canEditCost(cost));
+    return editableCosts.length > 0 && selectedCosts.length === editableCosts.length;
+  }, [sortedCosts, selectedCosts, isRepresentative, userRole]);
+
   const isEditButtonEnabled = selectedCosts.length === 1 && canEdit;
   const isDeleteButtonEnabled = selectedCosts.length > 0 && canDelete;
 
@@ -1201,6 +1267,7 @@ const CostsView = () => {
                         <Checkbox
                           checked={allCostsSelected}
                           onCheckedChange={handleSelectAllCosts}
+                          disabled={userRole !== 'ADMIN' && userRole !== 'BASIA'}
                           aria-label="Zaznacz wszystkie koszty"
                         />
                       </TableHead>
@@ -1293,6 +1360,7 @@ const CostsView = () => {
                                 onCheckedChange={(checked) =>
                                   handleSelectCost(cost.cost_id, checked === true)
                                 }
+                                disabled={!canEditCost(cost)}
                                 aria-label={`Zaznacz koszt ${cost.cost_id}`}
                               />
                             </TableCell>
