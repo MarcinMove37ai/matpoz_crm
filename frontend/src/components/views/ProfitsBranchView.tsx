@@ -290,62 +290,48 @@ const renderHeader = () => {
   // Pobierz dane roczne - zaktualizowana aby używać roku z currentDate i uwzględniać saldo roku poprzedniego
   useEffect(() => {
     if (!currentDate) return;
+    if (!yearsData?.years?.length) return;
 
     // Używamy selectedYear jeśli jest dostępny, w przeciwnym razie używamy currentDate.systemYear
     const yearToFetch = currentDate.year || currentDate.systemYear;
     const previousYear = yearToFetch - 1;
 
+    const fetchBalanceForYear = async (
+      year: number,
+      minYear: number
+    ): Promise<{ balance: number; balancePaid: number }> => {
+      if (year < minYear) return { balance: 0, balancePaid: 0 };
+
+      const prevBalance = await fetchBalanceForYear(year - 1, minYear);
+      const isRep = branch === "MG" || branch === "STH" || branch === "BHP";
+
+      const [salesRes, costsRes, payoutsRes] = await Promise.all([
+        fetch(`/api/aggregated_profits?year=${year}${branchQuery}`),
+        fetch(`/api/costs/summary?year=${year}${branchQuery}`),
+        fetch(`/api/costs/branch_payouts?year=${year}${branchQuery}`)
+      ]);
+      const [salesData, costsData, payoutsData] = await Promise.all([
+        salesRes.json(), costsRes.json(), payoutsRes.json()
+      ]);
+
+      const profit = isRep ? salesData.data[0]?.rep_profit || 0 : salesData.data[0]?.branch_profit || 0;
+      const profitPaid = isRep ? salesData.data[0]?.rep_profit_paid || 0 : salesData.data[0]?.branch_profit_paid || 0;
+      const totalCost = isRep ? costsData.total_summary?.total_ph_cost || 0 : costsData.total_summary?.total_branch_cost || 0;
+      const payout = payoutsData.find((item: { branch: string }) => item.branch === branch)?.total_payout || 0;
+
+      return {
+        balance: prevBalance.balance + profit - totalCost - payout,
+        balancePaid: prevBalance.balancePaid + profitPaid - totalCost - payout,
+      };
+    };
+
     const fetchYearlyData = async () => {
       try {
-        // Najpierw pobierz dane z poprzedniego roku, aby uzyskać saldo
-        let previousYearBalance = 0;
-        let previousYearBalancePaid = 0;
-
-        // Sprawdź, czy poprzedni rok nie jest wcześniejszy niż najstarszy dostępny rok
-        if (previousYear >= (yearsData?.years?.[yearsData.years.length - 1] || 0)) {
-          // Pobierz dane sprzedażowe z poprzedniego roku
-          const prevSalesResponse = await fetch(
-            `/api/aggregated_profits?year=${previousYear}${branchQuery}`
-          );
-          const prevSalesData = await prevSalesResponse.json();
-
-          // Pobierz dane kosztowe z poprzedniego roku
-          const prevCostsResponse = await fetch(
-            `/api/costs/summary?year=${previousYear}${branchQuery}`
-          );
-          const prevCostsData = await prevCostsResponse.json();
-
-          // Pobierz dane o wypłatach z poprzedniego roku
-          const prevPayoutsResponse = await fetch(
-            `/api/costs/branch_payouts?year=${previousYear}${branchQuery}`
-          );
-          const prevPayoutsData = await prevPayoutsResponse.json();
-
-          // Znajdź odpowiednią wypłatę dla danego oddziału
-          const prevBranchPayout = prevPayoutsData.find((item: { branch: string }) =>
-            item.branch === branch
-          )?.total_payout || 0;
-
-          // Przetwarzanie danych sprzedażowych z poprzedniego roku
-          const prevProfit = branch === "MG" || branch === "STH" || branch === "BHP"
-            ? prevSalesData.data[0]?.rep_profit || 0
-            : prevSalesData.data[0]?.branch_profit || 0;
-
-          const prevProfitPaid = branch === "MG" || branch === "STH" || branch === "BHP"
-            ? prevSalesData.data[0]?.rep_profit_paid || 0
-            : prevSalesData.data[0]?.branch_profit_paid || 0;
-
-          // Przetwarzanie danych kosztowych z poprzedniego roku
-          const prevTotalCost = branch === "MG" || branch === "STH" || branch === "BHP"
-            ? prevCostsData.total_summary?.total_ph_cost || 0
-            : prevCostsData.total_summary?.total_branch_cost || 0;
-
-          // Oblicz saldo z poprzedniego roku
-          previousYearBalance = prevProfit - prevTotalCost - prevBranchPayout;
-          previousYearBalancePaid = prevProfitPaid - prevTotalCost - prevBranchPayout;
-
-          // Nie ograniczamy ujemnego salda - będzie pomniejszać saldo bieżącego roku
-        }
+        // Pobierz skumulowane saldo z poprzedniego roku (rekurencyjnie)
+        const minYear = Math.min(...yearsData.years);
+        const prevBalance = await fetchBalanceForYear(previousYear, minYear);
+        const previousYearBalance = prevBalance.balance;
+        const previousYearBalancePaid = prevBalance.balancePaid;
 
         // Teraz pobierz dane dla bieżącego roku
         const salesResponse = await fetch(

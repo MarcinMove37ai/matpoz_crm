@@ -302,46 +302,39 @@ export const RepresentativeProfitsCard: React.FC<RepresentativeProfitsCardProps>
       return { balance: 0, balancePaid: 0 };
     }
 
-    const previousYear = (currentDate.year || currentDate.systemYear) - 1;
-
-    // Sprawdź, czy poprzedni rok jest dostępny
-    if (!yearsData?.years || previousYear < (yearsData.years[yearsData.years.length - 1] || 0)) {
+    if (!yearsData?.years || yearsData.years.length === 0) {
       return { balance: 0, balancePaid: 0 };
     }
 
-    // Filtrowanie danych z poprzedniego roku dla wybranego przedstawiciela (wszystkie oddziały)
-    const filteredPrevYearSalesData = previousYearSalesData.filter(item =>
-      item.representative_name === representative &&
-      item.year === previousYear &&
-      (!branchFilter || item.branch_name === branchFilter)
-    );
+    const currentYear = currentDate.year || currentDate.systemYear;
+    const minYear = Math.min(...yearsData.years);
 
-    if (filteredPrevYearSalesData.length === 0) {
-      return { balance: 0, balancePaid: 0 };
-    }
+    // Iteracyjne obliczanie skumulowanego salda od minYear do currentYear-1
+    let accBalance = 0;
+    let accBalancePaid = 0;
 
-    // Agreguj wszystkie dane sprzedażowe dla przedstawiciela (niezależnie od oddziału)
-    const aggregatedPrevSalesData = filteredPrevYearSalesData.reduce((acc, item) => {
-      return {
+    for (let y = minYear; y < currentYear; y++) {
+      const yearSalesData = previousYearSalesData.filter(item =>
+        item.representative_name === representative &&
+        item.year === y &&
+        (!branchFilter || item.branch_name === branchFilter)
+      );
+
+      if (yearSalesData.length === 0) continue;
+
+      const aggregated = yearSalesData.reduce((acc, item) => ({
         profit_net: (acc.profit_net || 0) + (item.profit_net || 0),
         profit_payd: (acc.profit_payd || 0) + (item.profit_payd || 0),
-      };
-    }, { profit_net: 0, profit_payd: 0 });
+      }), { profit_net: 0, profit_payd: 0 });
 
-    // Pobierz łączny koszt dla wszystkich oddziałów przedstawiciela
-    const totalPrevCost = getCostForRepresentative(previousYear, null, branchFilter || null, previousYearCostsData);
+      const yearCost = getCostForRepresentative(y, null, branchFilter || null, previousYearCostsData);
+      const yearPayout = getPayoutForRepresentative(y, null, branchFilter || null, previousYearPayoutsData);
 
-    // Pobierz łączne wypłaty dla wszystkich oddziałów przedstawiciela
-    const totalPrevPayout = getPayoutForRepresentative(previousYear, null, branchFilter || null, previousYearPayoutsData);
+      accBalance += aggregated.profit_net - yearCost - yearPayout;
+      accBalancePaid += aggregated.profit_payd - yearCost - yearPayout;
+    }
 
-    // Oblicz saldo dla poprzedniego roku
-    const prevNetProfit = (aggregatedPrevSalesData.profit_net || 0) - totalPrevCost;
-    const prevNetProfitPaid = (aggregatedPrevSalesData.profit_payd || 0) - totalPrevCost;
-
-    return {
-      balance: prevNetProfit - totalPrevPayout,
-      balancePaid: prevNetProfitPaid - totalPrevPayout
-    };
+    return { balance: accBalance, balancePaid: accBalancePaid };
   };
 
   // Pobierz dane roczne - zaktualizowana implementacja z uwzględnieniem poprzedniego roku
@@ -1270,11 +1263,9 @@ const ProfitsPHView: React.FC = () => {
   const fetchPreviousYearData = useCallback(async (year: number) => {
     if (!yearsData?.years || yearsData.years.length === 0) return;
 
-    const previousYear = year - 1;
+    const minYear = Math.min(...yearsData.years);
 
-    // Sprawdź, czy poprzedni rok jest dostępny w danych
-    if (previousYear < yearsData.years[yearsData.years.length - 1]) {
-      console.log(`Poprzedni rok ${previousYear} nie jest dostępny w danych`);
+    if (year - 1 < minYear) {
       setPreviousYearSalesData([]);
       setPreviousYearCostsData([]);
       setPreviousYearPayoutsData([]);
@@ -1284,38 +1275,41 @@ const ProfitsPHView: React.FC = () => {
     try {
       setPreviousYearDataLoading(true);
 
-      // 1. Pobieranie danych sprzedażowych z poprzedniego roku
-      const prevSalesResponse = await fetch(`/api/aggregated_representative_ind_data?year=${previousYear}&fields_set=minimal`);
-      if (!prevSalesResponse.ok) {
-        throw new Error(`Błąd pobierania danych sprzedażowych dla poprzedniego roku: ${prevSalesResponse.status}`);
+      const allPrevSales: ApiSalesData[] = [];
+      const allPrevCosts: ApiCostData[] = [];
+      const allPrevPayouts: ApiPayoutData[] = [];
+
+      // Pobieramy dane dla WSZYSTKICH lat historycznych (od minYear do year-1)
+      for (let y = minYear; y < year; y++) {
+        const [salesRes, costsRes, payoutsRes] = await Promise.all([
+          fetch(`/api/aggregated_representative_ind_data?year=${y}&fields_set=minimal`),
+          fetch(`/api/costs/representatives-summary?year=${y}`),
+          fetch(`/api/costs/representative_payouts?year=${y}`)
+        ]);
+
+        if (!salesRes.ok || !costsRes.ok || !payoutsRes.ok) {
+          console.warn(`Błąd pobierania danych dla roku ${y}`);
+          continue;
+        }
+
+        const [salesData, costsData, payoutsData] = await Promise.all([
+          salesRes.json(), costsRes.json(), payoutsRes.json()
+        ]);
+
+        allPrevSales.push(...(salesData.data || []));
+        allPrevCosts.push(...(costsData.data || []));
+        allPrevPayouts.push(...(payoutsData || []));
       }
-      const prevSalesData = await prevSalesResponse.json();
 
-      // 2. Pobieranie danych kosztowych dla poprzedniego roku - NOWY ENDPOINT
-      const prevCostsResponse = await fetch(`/api/costs/representatives-summary?year=${previousYear}`);
-      if (!prevCostsResponse.ok) {
-        throw new Error(`Błąd pobierania danych kosztowych dla poprzedniego roku: ${prevCostsResponse.status}`);
-      }
-      const prevCostsData = await prevCostsResponse.json();
+      setPreviousYearSalesData(allPrevSales);
+      setPreviousYearCostsData(allPrevCosts);
+      setPreviousYearPayoutsData(allPrevPayouts);
 
-      // 3. Pobieranie danych o wypłatach dla poprzedniego roku
-      const prevPayoutsResponse = await fetch(`/api/costs/representative_payouts?year=${previousYear}`);
-      if (!prevPayoutsResponse.ok) {
-        throw new Error(`Błąd pobierania danych o wypłatach dla poprzedniego roku: ${prevPayoutsResponse.status}`);
-      }
-      const prevPayoutsData = await prevPayoutsResponse.json();
-
-      // Aktualizacja stanów
-      setPreviousYearSalesData(prevSalesData.data || []);
-      setPreviousYearCostsData(prevCostsData.data || []); // Używamy nowej struktury
-      setPreviousYearPayoutsData(prevPayoutsData || []);
-
-      console.log(`Pobrano dane dla poprzedniego roku ${previousYear}`);
-      console.log(`Koszty z poprzedniego roku: ${(prevCostsData.data || []).length} rekordów`);
+      console.log(`Pobrano dane historyczne dla lat ${minYear}–${year - 1}`);
 
     } catch (err) {
       if (err instanceof Error && err.name !== 'AbortError') {
-        console.error(`Błąd pobierania danych dla poprzedniego roku ${previousYear}:`, err);
+        console.error(`Błąd pobierania danych historycznych:`, err);
       }
     } finally {
       setPreviousYearDataLoading(false);
