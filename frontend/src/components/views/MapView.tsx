@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
-import { Building2, Users, Navigation, Circle, ListFilter } from 'lucide-react';
+import { Building2, Users, Navigation, Circle, ListFilter, MapPin, Ruler, X } from 'lucide-react';
 // Import useAuth hook to access user location data
 import { useAuth } from '@/hooks/useAuth';
 // Import User icon for user location marker
@@ -245,6 +245,7 @@ const MapView = () => {
   const userMarkerRef = useRef<mapboxgl.Marker | null>(null); // Referencja do markera użytkownika
   const turfRef = useRef<any>(null); // Referencja do biblioteki turf.js
   const [mapLoaded, setMapLoaded] = useState(false);
+  const mapLoadedRef = useRef(false);
   const [mapError, setMapError] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [radiusIndicatorRef, setRadiusIndicatorRef] = useState<HTMLDivElement | null>(null);
@@ -293,6 +294,21 @@ const MapView = () => {
     freeInRadius: 0,
     busyInRadius: 0,
     ownInRadius: 0 // Dodajemy statystykę dla własnych klientów w promieniu
+  });
+
+  // Stan trybu pomiaru
+  const [isMeasurementMode, setIsMeasurementMode] = useState(false);
+  const isMeasurementModeRef = useRef(false);
+  const [measurePin, setMeasurePin] = useState<{ lat: number; lng: number } | null>(null);
+  const measurePinRef = useRef<{ lat: number; lng: number } | null>(null);
+  const measurementMarkerRef = useRef<mapboxgl.Marker | null>(null);
+  const [measureRadiusKm, setMeasureRadiusKm] = useState<number>(15);
+  const measureRadiusKmRef = useRef<number>(15);
+  const [measureRadiusStats, setMeasureRadiusStats] = useState({
+    totalInRadius: 0,
+    freeInRadius: 0,
+    busyInRadius: 0,
+    ownInRadius: 0,
   });
 
   // Użycie hooka do pobierania danych klientów
@@ -552,7 +568,101 @@ const MapView = () => {
     }
   };
 
-  // Przygotowanie danych dla warstw - KLUCZOWA FUNKCJA DO AKTUALIZACJI
+  // Funkcja obliczająca statystyki klientów w promieniu pomiaru
+  const calculateMeasureRadiusStats = (pin?: { lat: number; lng: number } | null, radius?: number) => {
+    const usedPin = pin !== undefined ? pin : measurePinRef.current;
+    const usedRadius = radius !== undefined ? radius : measureRadiusKm;
+    if (!usedPin || !clients.length || !turfRef.current) {
+      setMeasureRadiusStats({ totalInRadius: 0, freeInRadius: 0, busyInRadius: 0, ownInRadius: 0 });
+      return;
+    }
+    try {
+      const turf = turfRef.current;
+      const pinPoint = turf.point([usedPin.lng, usedPin.lat]);
+      const inRadius = clients.filter(client => {
+        const cp = turf.point([client.longitude, client.latitude]);
+        return turf.distance(pinPoint, cp, { units: 'kilometers' }) <= usedRadius;
+      });
+      const total = inRadius.length;
+      const free = inRadius.filter(c => c.status_free).length;
+      const own = inRadius.filter(c => c.rep === userDisplayName).length;
+      const busy = inRadius.filter(c => !c.status_free && c.rep !== userDisplayName).length;
+      setMeasureRadiusStats({ totalInRadius: total, freeInRadius: free, busyInRadius: busy, ownInRadius: own });
+    } catch (err) {
+      console.error('Błąd obliczania statystyk pomiaru:', err);
+      setMeasureRadiusStats({ totalInRadius: 0, freeInRadius: 0, busyInRadius: 0, ownInRadius: 0 });
+    }
+  };
+
+  // Funkcja rysująca okrąg wokół pinezki pomiaru
+  const updateMeasureRadiusCircle = (pin?: { lat: number; lng: number } | null, radius?: number) => {
+    const usedPin = pin !== undefined ? pin : measurePinRef.current;
+    const usedRadius = radius !== undefined ? radius : measureRadiusKm;
+    if (!mapRef.current || !mapLoadedRef.current || !turfRef.current) return;
+    const map = mapRef.current;
+    const turf = turfRef.current;
+    try {
+      if (!usedPin) {
+        // Ukryj okrąg jeśli brak pinezki
+        if (map.getLayer('measure-radius-fill')) {
+          map.setLayoutProperty('measure-radius-fill', 'visibility', 'none');
+          map.setLayoutProperty('measure-radius-border', 'visibility', 'none');
+        }
+        return;
+      }
+      const center = turf.point([usedPin.lng, usedPin.lat]);
+      const circle = turf.circle(center, usedRadius, { steps: 128, units: 'kilometers' });
+      if (map.getSource('measure-radius-source')) {
+        (map.getSource('measure-radius-source') as mapboxgl.GeoJSONSource).setData(circle);
+        if (map.getLayer('measure-radius-fill')) {
+          map.setLayoutProperty('measure-radius-fill', 'visibility', 'visible');
+          map.setLayoutProperty('measure-radius-border', 'visibility', 'visible');
+        }
+        // Dopasuj widok do okręgu
+        const bounds = turf.bbox(circle);
+        map.fitBounds([[bounds[0], bounds[1]], [bounds[2], bounds[3]]], {
+          padding: { top: 60, bottom: 60, left: 60, right: 60 }, duration: 800, maxZoom: 11
+        });
+      }
+    } catch (err) {
+      console.error('Błąd rysowania okręgu pomiaru:', err);
+    }
+  };
+
+  // Włączenie / wyłączenie trybu pomiaru
+  const toggleMeasurementMode = () => {
+    const next = !isMeasurementMode;
+    setIsMeasurementMode(next);
+    isMeasurementModeRef.current = next;
+    if (!next) {
+      // Wyczyść po wyjściu z trybu
+      setMeasurePin(null);
+      measurePinRef.current = null;
+      if (measurementMarkerRef.current) {
+        measurementMarkerRef.current.remove();
+        measurementMarkerRef.current = null;
+      }
+      setMeasureRadiusStats({ totalInRadius: 0, freeInRadius: 0, busyInRadius: 0, ownInRadius: 0 });
+      // Ukryj okrąg pomiaru
+      if (mapRef.current && mapLoaded && mapRef.current.getLayer('measure-radius-fill')) {
+        mapRef.current.setLayoutProperty('measure-radius-fill', 'visibility', 'none');
+        mapRef.current.setLayoutProperty('measure-radius-border', 'visibility', 'none');
+      }
+      // Przywróć kursor
+      if (mapRef.current) mapRef.current.getCanvas().style.cursor = '';
+      // Pokaż marker użytkownika
+      if (userMarkerRef.current) {
+        userMarkerRef.current.getElement().style.display = '';
+      }
+    } else {
+      // Ukryj marker użytkownika w trybie pomiaru
+      if (userMarkerRef.current) {
+        userMarkerRef.current.getElement().style.display = 'none';
+      }
+      // Ustaw kursor celownika
+      if (mapRef.current) mapRef.current.getCanvas().style.cursor = 'crosshair';
+    }
+  };
   const prepareMapData = () => {
     if (!mapRef.current || !mapLoaded) {
       console.log('Mapa nie jest gotowa do przygotowania danych');
@@ -990,6 +1100,30 @@ const MapView = () => {
         }
       });
 
+      // Źródło dla okręgu pomiaru
+      map.addSource('measure-radius-source', {
+        type: 'geojson',
+        data: { type: 'Feature' as const, properties: {}, geometry: { type: 'Polygon' as const, coordinates: [[]] } }
+      });
+
+      // Wypełnienie okręgu pomiaru
+      map.addLayer({
+        id: 'measure-radius-fill',
+        type: 'fill',
+        source: 'measure-radius-source',
+        paint: { 'fill-color': '#f59e0b', 'fill-opacity': 0.12 },
+        layout: { 'visibility': 'none' }
+      }, 'clients-free-layer');
+
+      // Obramowanie okręgu pomiaru
+      map.addLayer({
+        id: 'measure-radius-border',
+        type: 'line',
+        source: 'measure-radius-source',
+        paint: { 'line-color': '#f59e0b', 'line-width': 2, 'line-opacity': 0.8, 'line-dasharray': [3, 2] },
+        layout: { 'visibility': 'none' }
+      });
+
       // Dodanie interakcji
       setupMapInteractions(map);
 
@@ -1006,6 +1140,38 @@ const MapView = () => {
 
   // Funkcja dodająca interakcje z mapą
   const setupMapInteractions = (map: mapboxgl.Map) => {
+    // Obsługa kliknięć w trybie pomiaru – umieszcza pinezkę
+    map.on('click', (e: any) => {
+      if (!isMeasurementModeRef.current) return;
+      // Zatrzymaj propagację do handlerów warstw
+      const features = map.queryRenderedFeatures(e.point, {
+        layers: ['branches-pin-base', 'clients-free-layer', 'clients-own-layer', 'clients-assigned-layer']
+      });
+      // Stawiamy pinezkę nawet na elementach mapy
+      const { lng, lat } = e.lngLat;
+      const pin = { lat, lng };
+      setMeasurePin(pin);
+      measurePinRef.current = pin;
+
+      // Utwórz / przesuń marker pomiaru
+      const mapboxgl = require('mapbox-gl');
+      if (measurementMarkerRef.current) {
+        measurementMarkerRef.current.setLngLat([lng, lat]);
+      } else {
+        const el = document.createElement('div');
+        el.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="#f59e0b" stroke="white" stroke-width="1.5"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>`;
+        el.style.cursor = 'crosshair';
+        measurementMarkerRef.current = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
+          .setLngLat([lng, lat])
+          .addTo(map);
+      }
+
+      // Aktualizuj okrąg i statystyki
+      const currentRadius = measureRadiusKmRef.current;
+      updateMeasureRadiusCircle(pin, currentRadius);
+      calculateMeasureRadiusStats(pin, currentRadius);
+    });
+
     // Obsługa kliknięć na oddziały (pinezki)
     map.on('click', 'branches-pin-base', (e: any) => {
       if (!e.features?.[0]?.properties?.id) return;
@@ -1487,7 +1653,7 @@ const MapView = () => {
         }
 
         // Ustawienie tokena
-        const token = 'pk.eyJ1IjoibW92ZTM3dGgiLCJhIjoiY204ZWZwdGgyMDFjMzJpczRmOWV4bXVpMyJ9.jdRudTW7yRSpIcEwq2o7iw';
+        const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || '';
         mapboxgl.accessToken = token;
         console.log('Mapbox token ustawiony');
 
@@ -1529,6 +1695,7 @@ const MapView = () => {
           map.on('load', () => {
             console.log('Mapa załadowana pomyślnie');
             setMapLoaded(true);
+            mapLoadedRef.current = true;
 
             // Dodanie obrazu markera dla oddziałów jeśli nie istnieje domyślnie
             if (!map.hasImage('marker-15')) {
@@ -1689,6 +1856,10 @@ const MapView = () => {
             userMarkerRef.current.remove();
             userMarkerRef.current = null;
           }
+          if (measurementMarkerRef.current) {
+            measurementMarkerRef.current.remove();
+            measurementMarkerRef.current = null;
+          }
           mapRef.current.remove();
           mapRef.current = null;
         }
@@ -1765,12 +1936,42 @@ const MapView = () => {
     }
   }, [clients, userRadiusKm]);
 
+  // Efekt aktualizujący okrąg pomiaru przy zmianie promienia
+  useEffect(() => {
+    if (isMeasurementMode && measurePin && mapLoaded) {
+      updateMeasureRadiusCircle(measurePin, measureRadiusKm);
+      calculateMeasureRadiusStats(measurePin, measureRadiusKm);
+    }
+  }, [measureRadiusKm, isMeasurementMode, mapLoaded]);
+
+  // Efekt aktualizujący statystyki pomiaru przy zmianie klientów
+  useEffect(() => {
+    if (isMeasurementMode && measurePin && clients.length > 0) {
+      calculateMeasureRadiusStats(measurePin, measureRadiusKm);
+    }
+  }, [clients, isMeasurementMode, measurePin]);
+
   // Renderowanie komponentu
   return (
     <Card className="shadow-lg">
       <CardContent className="p-0">
                   {/* Panel filtrów - zaktualizowany układ */}
                     <div className="p-4 border-b bg-gray-50">
+                      {/* Górny pasek: filtry + przycisk pomiaru */}
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Filtry mapy</span>
+                        <button
+                          onClick={toggleMeasurementMode}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium border transition-colors ${
+                            isMeasurementMode
+                              ? 'bg-amber-500 border-amber-600 text-white shadow-sm'
+                              : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-100'
+                          }`}
+                        >
+                          <Ruler size={14} />
+                          {isMeasurementMode ? 'Zakończ pomiar' : 'Tryb pomiaru'}
+                        </button>
+                      </div>
                       <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
                         {/* Filtry typów punktów - lewa kolumna na desktop */}
                         <div className="md:col-span-8 flex flex-wrap justify-center md:justify-start items-center gap-4 md:gap-6">
@@ -1875,10 +2076,104 @@ const MapView = () => {
                           </div>
                         </div>
                     </div>
-                  </div>
+                    </div>
 
         {/* Kontener mapy z responsywną wysokością */}
         <div className="w-full h-[70vh] min-h-[450px] relative overflow-hidden" ref={mapContainer} id="map-container">
+          {/* Overlay trybu pomiaru */}
+          {isMeasurementMode && (
+            <div className="absolute top-3 left-3 z-10 bg-white rounded-lg shadow-lg border border-amber-300 w-64 text-sm overflow-hidden">
+              {/* Nagłówek */}
+              <div className="bg-amber-500 text-white px-3 py-2 flex items-center justify-between">
+                <div className="flex items-center gap-1.5 font-semibold">
+                  <Ruler size={14} />
+                  Tryb pomiaru
+                </div>
+                <button onClick={toggleMeasurementMode} className="hover:bg-amber-600 rounded p-0.5">
+                  <X size={14} />
+                </button>
+              </div>
+
+              {/* Instrukcja lub wyniki */}
+              {!measurePin ? (
+                <div className="px-3 py-3 text-gray-500 flex items-start gap-2">
+                  <MapPin size={16} className="text-amber-500 mt-0.5 flex-shrink-0" />
+                  <span>Kliknij dowolne miejsce na mapie, aby ustawić punkt pomiaru</span>
+                </div>
+              ) : (
+                <div className="px-3 py-2">
+                  <div className="text-xs text-gray-500 mb-2">
+                    📍 {measurePin.lat.toFixed(4)}, {measurePin.lng.toFixed(4)}
+                  </div>
+
+                  {/* Wybór promienia */}
+                  <div className="flex items-center gap-2 mb-3">
+                    <Circle size={13} className="text-amber-500 flex-shrink-0" />
+                    <span className="text-gray-700 font-medium text-xs">Promień:</span>
+                    <select
+                      value={measureRadiusKm}
+                      onChange={e => {
+                        const val = parseInt(e.target.value);
+                        setMeasureRadiusKm(val);
+                        measureRadiusKmRef.current = val;
+                        updateMeasureRadiusCircle(measurePin, val);
+                        calculateMeasureRadiusStats(measurePin, val);
+                      }}
+                      className="ml-auto border border-gray-200 rounded px-1.5 py-0.5 text-xs bg-white font-semibold"
+                      style={{ color: measureRadiusKm <= 20 ? '#16a34a' : measureRadiusKm <= 40 ? '#d97706' : measureRadiusKm <= 80 ? '#dc2626' : '#7c3aed' }}
+                    >
+                      {RADIUS_OPTIONS.map(r => {
+                        const color = r <= 20 ? '#16a34a' : r <= 40 ? '#d97706' : r <= 80 ? '#dc2626' : '#7c3aed';
+                        return (
+                          <option key={r} value={r} style={{ color, fontWeight: 600 }}>{r} km</option>
+                        );
+                      })}
+                    </select>
+                  </div>
+
+                  {/* Statystyki */}
+                  <div className="space-y-1.5 border-t pt-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600">Łącznie w promieniu:</span>
+                      <span className="font-bold text-gray-800">{measureRadiusStats.totalInRadius}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-1">
+                        <div className="w-2.5 h-2.5 rounded-full bg-green-500"></div>
+                        <span className="text-gray-600">Wolni:</span>
+                      </div>
+                      <span className="font-bold text-green-600">{measureRadiusStats.freeInRadius}</span>
+                    </div>
+                    {!isBranchUser && (
+                      <>
+                        <div className="flex justify-between items-center">
+                          <div className="flex items-center gap-1">
+                            <div className="w-2.5 h-2.5 rounded-full bg-red-500"></div>
+                            <span className="text-gray-600">Zajęci:</span>
+                          </div>
+                          <span className="font-bold text-red-600">{measureRadiusStats.busyInRadius}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <div className="flex items-center gap-1">
+                            <div className="w-2.5 h-2.5 rounded-full bg-purple-600"></div>
+                            <span className="text-gray-600">Moi:</span>
+                          </div>
+                          <span className="font-bold text-purple-600">{measureRadiusStats.ownInRadius}</span>
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Podpowiedź o przesuwaniu */}
+                  <div className="mt-2 pt-2 border-t text-xs text-gray-400 flex items-center gap-1">
+                    <MapPin size={11} />
+                    Kliknij inne miejsce aby przesunąć punkt
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Status ładowania mapy */}
           {!mapLoaded && !mapError && (
             <div className="absolute inset-0 flex items-center justify-center bg-gray-100 bg-opacity-80">
