@@ -24,6 +24,8 @@ import { Button } from '@/components/ui/button';
 import mapboxgl from 'mapbox-gl';
 // Import GeoJSON types
 import { Feature, FeatureCollection, Geometry, GeoJsonProperties, Point } from 'geojson';
+// Import danych przedstawicieli handlowych (PH)
+import SALES_REPS_DATA from '@/data/sales-reps.json';
 
 // Interfejs dla danych oddziału
 interface Branch {
@@ -50,6 +52,19 @@ interface Client {
 interface SelectedItem {
   type: 'branch' | 'client';
   data: Branch | Client;
+}
+
+// Interfejs dla przedstawiciela handlowego (PH)
+interface SalesRep {
+  id: string;
+  firstName: string;
+  lastName: string;
+  phone: string;
+  salesPotential: number;
+  totalNetValue: number;
+  latitude: number | null;
+  longitude: number | null;
+  address: { street: string; postalCode: string; city: string };
 }
 
 // Statyczne dane oddziałów
@@ -244,6 +259,7 @@ const MapView = () => {
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const userMarkerRef = useRef<mapboxgl.Marker | null>(null); // Referencja do markera użytkownika
   const turfRef = useRef<any>(null); // Referencja do biblioteki turf.js
+  const repMarkersRef = useRef<mapboxgl.Marker[]>([]); // Markery przedstawicieli handlowych (PH)
   const [mapLoaded, setMapLoaded] = useState(false);
   const mapLoadedRef = useRef(false);
   const [mapError, setMapError] = useState<string | null>(null);
@@ -282,6 +298,7 @@ const MapView = () => {
   const [showBusyClients, setShowBusyClients] = useState<boolean>(true);
   const [showOwnClients, setShowOwnClients] = useState<boolean>(true); // Nowy stan dla własnych klientów
   const [showBranchMarkers, setShowBranchMarkers] = useState<boolean>(true);
+  const [showSalesReps, setShowSalesReps] = useState<boolean>(false); // Warstwa PH - domyślnie wyłączona
   const [visibleClientsCount, setVisibleClientsCount] = useState<number>(0);
   const [selectedItem, setSelectedItem] = useState<SelectedItem | null>(null);
 
@@ -812,7 +829,7 @@ const MapView = () => {
       }))
     };
 
-    // Aktualizuj źródła danych, jeśli istnieją
+
     try {
       if (map.getSource('branches-source')) {
         // Rzutowanie na GeoJSONSource dla dostępu do metody setData
@@ -823,6 +840,7 @@ const MapView = () => {
         // Rzutowanie na GeoJSONSource dla dostępu do metody setData
         (map.getSource('clients-source') as mapboxgl.GeoJSONSource).setData(clientsGeoJSON);
       }
+
 
       // Sprawdź liczbę widocznych klientów
       if (map.getLayer('clients-labels')) {
@@ -855,6 +873,77 @@ const MapView = () => {
     } catch (err) {
       console.error('Błąd podczas aktualizacji źródeł danych:', err);
     }
+
+    // Renderowanie markerów przedstawicieli handlowych (PH)
+    renderSalesRepMarkers(map);
+  };
+
+  // Funkcja renderująca markery PH jako elementy HTML
+  const renderSalesRepMarkers = (map: mapboxgl.Map) => {
+    const mapboxgl = require('mapbox-gl');
+
+    // Usuń istniejące markery PH
+    repMarkersRef.current.forEach(marker => marker.remove());
+    repMarkersRef.current = [];
+
+    // Jeśli warstwa wyłączona - nie rysuj nic
+    if (!showSalesReps) return;
+
+    (SALES_REPS_DATA as SalesRep[])
+      .filter(rep => rep.latitude != null && rep.longitude != null)
+      .forEach(rep => {
+        const potential = Math.max(0, Math.min(100, Number(rep.salesPotential) || 0));
+        const hue = potential * 1.2; // 0 = czerwony, 120 = zielony
+        const barColor = `hsl(${hue}, 70%, 42%)`;
+        const potentialLabel = Number(potential.toFixed(1));
+        const initial = rep.lastName ? `${rep.lastName.charAt(0)}.` : '';
+        const displayName = `${rep.firstName} ${initial}`.trim();
+
+        // Kontener markera PH
+        const el = document.createElement('div');
+        el.className = 'rep-marker';
+        el.innerHTML = `
+          <div class="rep-marker-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                 fill="none" stroke="#ffffff" stroke-width="2.5"
+                 stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="8" r="4"></circle>
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+            </svg>
+          </div>
+          <div class="rep-marker-label">${displayName}</div>
+          <div class="rep-marker-bar-wrap">
+            <div class="rep-marker-bar-track">
+              <div class="rep-marker-bar-fill" style="width:${potential}%; background:${barColor};"></div>
+            </div>
+            <span class="rep-marker-bar-pct" style="color:${barColor};">${potentialLabel}%</span>
+          </div>
+        `;
+
+        // Klik w marker -> popup z telefonem i dużym paskiem
+        el.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          createSalesRepPopup(
+            {
+              firstName: rep.firstName,
+              lastName: rep.lastName,
+              phone: rep.phone || '',
+              salesPotential: rep.salesPotential,
+            },
+            [rep.longitude as number, rep.latitude as number]
+          );
+          mapRef.current?.flyTo({
+            center: [rep.longitude as number, rep.latitude as number],
+            zoom: 11,
+          });
+        });
+
+        const marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
+          .setLngLat([rep.longitude as number, rep.latitude as number])
+          .addTo(map);
+
+        repMarkersRef.current.push(marker);
+      });
   };
 
   // Inicjalizacja warstw na mapie
@@ -1205,7 +1294,7 @@ const MapView = () => {
       handleItemSelection('client', clientData, e);
     });
 
-    // Zmiana kursora - dodajemy nową warstwę own-clients
+    // Zmiana kursora - warstwy own-clients
     ['branches-pin-base', 'clients-free-layer', 'clients-own-layer', 'clients-assigned-layer'].forEach(layer => {
       map.on('mouseenter', layer, () => { map.getCanvas().style.cursor = 'pointer'; });
       map.on('mouseleave', layer, () => { map.getCanvas().style.cursor = ''; });
@@ -1337,6 +1426,54 @@ const MapView = () => {
         openNavigation(lat, lng);
       };
     }
+  };
+
+  // Funkcja tworząca popup dla przedstawiciela handlowego (PH)
+  const createSalesRepPopup = (props: any, coordinates: [number, number]) => {
+    if (!mapRef.current) return;
+    const map = mapRef.current;
+    const mapboxgl = require('mapbox-gl');
+
+    // Usuń istniejące popupy
+    document.querySelectorAll('.mapboxgl-popup').forEach(popup => popup.remove());
+
+    // Imię + inicjał nazwiska (bez pełnego nazwiska)
+    const initial = props.lastName ? `${String(props.lastName).charAt(0)}.` : '';
+    const displayName = `${props.firstName || ''} ${initial}`.trim();
+
+    // Potencjał i kolor paska (0% czerwony -> 100% zielony)
+    const potential = Math.max(0, Math.min(100, Number(props.salesPotential) || 0));
+    const hue = potential * 1.2; // 0 = czerwony, 120 = zielony
+    const barColor = `hsl(${hue}, 70%, 42%)`;
+    const potentialLabel = Number(potential.toFixed(1));
+
+    const phoneRow = props.phone
+      ? `<a href="tel:${String(props.phone).replace(/\s/g, '')}" style="color:#0d9488; text-decoration:none; font-size:13px;">${props.phone}</a>`
+      : `<span style="color:#9ca3af; font-size:13px;">brak numeru</span>`;
+
+    const popupContent = `
+      <div style="padding: 12px; max-width: 240px;">
+        <h3 style="margin: 0 0 8px 0; font-weight: bold; color: #6b7280;">${displayName}</h3>
+        <div style="margin: 0 0 10px 0;">${phoneRow}</div>
+        <div style="margin: 0 0 4px 0; font-size: 12px; color: #6b7280;">Potencjał sprzedażowy</div>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <div style="flex:1; height:10px; background:#e5e7eb; border-radius:5px; overflow:hidden;">
+            <div style="width:${potential}%; height:100%; background:${barColor}; border-radius:5px;"></div>
+          </div>
+          <span style="font-size:12px; font-weight:700; color:${barColor}; min-width:42px; text-align:right;">${potentialLabel}%</span>
+        </div>
+      </div>
+    `;
+
+    new mapboxgl.Popup({
+      closeButton: true,
+      closeOnClick: true,
+      maxWidth: '300px',
+      offset: 15
+    })
+      .setLngLat(coordinates)
+      .setHTML(popupContent)
+      .addTo(map);
   };
 
   // Funkcja do dopasowania widoku do granic Polski
@@ -1623,6 +1760,69 @@ const MapView = () => {
           box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
         }
 
+        .rep-marker {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          cursor: pointer;
+          width: 90px;
+        }
+
+        .rep-marker-icon {
+          width: 28px;
+          height: 28px;
+          background-color: #0d9488;
+          border: 2.5px solid #ffffff;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+        }
+
+        .rep-marker-label {
+          margin-top: 2px;
+          background-color: #0d9488;
+          color: #ffffff;
+          font-size: 11px;
+          font-weight: 600;
+          line-height: 1.2;
+          padding: 1px 7px;
+          border-radius: 9px;
+          white-space: nowrap;
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+        }
+
+        .rep-marker-bar-wrap {
+          margin-top: 3px;
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          background-color: rgba(255, 255, 255, 0.95);
+          padding: 2px 5px;
+          border-radius: 7px;
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+        }
+
+        .rep-marker-bar-track {
+          width: 44px;
+          height: 7px;
+          background-color: #e5e7eb;
+          border-radius: 4px;
+          overflow: hidden;
+        }
+
+        .rep-marker-bar-fill {
+          height: 100%;
+          border-radius: 4px;
+        }
+
+        .rep-marker-bar-pct {
+          font-size: 10px;
+          font-weight: 700;
+          white-space: nowrap;
+        }
+
         .radius-indicator {
           position: absolute;
           bottom: 10px;
@@ -1860,6 +2060,8 @@ const MapView = () => {
             measurementMarkerRef.current.remove();
             measurementMarkerRef.current = null;
           }
+          repMarkersRef.current.forEach(marker => marker.remove());
+          repMarkersRef.current = [];
           mapRef.current.remove();
           mapRef.current = null;
         }
@@ -1906,6 +2108,7 @@ const MapView = () => {
     showBusyClients,
     showOwnClients, // Dodana nowa zależność
     showBranchMarkers,
+    showSalesReps, // Zależność od warstwy PH
     hasUserLocation,
     userLatitude,
     userLongitude,
@@ -2027,6 +2230,23 @@ const MapView = () => {
                                   {userRadiusKm !== null && radiusStats.ownInRadius > 0 && (
                                     <span className="ml-1 font-bold">{radiusStats.ownInRadius}</span>
                                   )}
+                                </Label>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Checkbox "Pokaż PH" - tylko desktop */}
+                          { !isMobile && (
+                            <div className="flex items-center space-x-2">
+                              <Checkbox
+                                id="show-sales-reps"
+                                checked={showSalesReps}
+                                onCheckedChange={(checked) => setShowSalesReps(!!checked)}
+                              />
+                              <div className="flex items-center space-x-1">
+                                <div className="w-3 h-3 rounded-full bg-teal-600"></div>
+                                <Label htmlFor="show-sales-reps" className="text-sm font-medium text-gray-600">
+                                  Pokaż PH
                                 </Label>
                               </div>
                             </div>

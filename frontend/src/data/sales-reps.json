@@ -1,0 +1,437 @@
+[
+  {
+    "id": "ph-1",
+    "firstName": "Iwona",
+    "lastName": "Płoszaj",
+    "phone": "+48 509 705 127",
+    "salesPotential": 100.0,
+    "totalNetValue": 3991387.74,
+    "latitude": 52.642144,
+    "longitude": 18.723442,
+    "address": {
+      "street": "",
+      "postalCode": "88-220",
+      "city": "Osięciny"
+    }
+  },
+  {
+    "id": "ph-2",
+    "firstName": "Mateusz",
+    "lastName": "Karabin",
+    "phone": "+48 608 833 222",
+    "salesPotential": 71.15,
+    "totalNetValue": 2839729.19,
+    "latitude": 52.277849,
+    "longitude": 22.436633,
+    "address": {
+      "street": "",
+      "postalCode": "08-107",
+      "city": "Hołubla"
+    }
+  },
+  {
+    "id": "ph-3",
+    "firstName": "Kamil",
+    "lastName": "Jasek",
+    "phone": "+48 889 243 504",
+    "salesPotential": 25.14,
+    "totalNetValue": 1003617.39,
+    "latitude": 50.055741,
+    "longitude": 21.609633,
+    "address": {
+      "street": "",
+      "postalCode": "39-100",
+      "city": "Ropczyce"
+    }
+  },
+  {
+    "id": "ph-4",
+    "firstName": "Rafał",
+    "lastName": "Wiktor",
+    "phone": "+48 690 998 076",
+    "salesPotential": 21.33,
+    "totalNetValue": 851532.03,
+    "latitude": 50.870374,
+    "longitude": 18.435776,
+    "address": {
+      "street": "",
+      "postalCode": "46-300",
+      "city": "Olesno"
+    }
+  },
+  {
+    "id": "ph-5",
+    "firstName": "Mateusz",
+    "lastName": "Bobowski",
+    "phone": "+48 609 599 087",
+    "salesPotential": 20.22,
+    "totalNetValue": 807088.36,
+    "latitude": 50.65565,
+    "longitude": 19.357012,
+    "address": {
+      "street": "Jaroszów 41J",
+      "postalCode": "58-120",
+      "city": "Jaroszów"
+    }
+  },
+  {
+    "id": "ph-6",
+    "firstName": "Paweł",
+    "lastName": "Polak",
+    "phone": "+48 698 356 339",
+    "salesPotential": 11.86,
+    "totalNetValue": 473355.46,
+    "latitude": 50.206444,
+    "longitude": 19.75066,
+    "address": {
+      "street": "",
+      "postalCode": "32-048",
+      "city": "Jerzmanowice"
+    }
+  },
+  {
+    "id": "ph-7",
+    "firstName": "Marcin",
+    "lastName": "Topór",
+    "phone": "+48 667 618 708",
+    "salesPotential": 10.62,
+    "totalNetValue": 424020.81,
+    "latitude": 51.198636,
+    "longitude": 18.553061,
+    "address": {
+      "street": "ul. Cicha 20",
+      "postalCode": "98-300",
+      "city": "Gaszyn"
+    }
+  },
+  {
+    "id": "ph-8",
+    "firstName": "Paweł",
+    "lastName": "Stachowiak",
+    "phone": "+48 515 920 221",
+    "salesPotential": 5.72,
+    "totalNetValue": 228348.25,
+    "latitude": 51.876638,
+    "longitude": 16.950664,
+    "address": {
+      "street": "Gola 65/1",
+      "postalCode": "63-800",
+      "city": "Gostyń"
+    }
+  },
+  {
+    "id": "ph-9",
+    "firstName": "Artur",
+    "lastName": "Drozdowicz",
+    "phone": "+48 509 474 992",
+    "salesPotential": 4.59,
+    "totalNetValue": 183309.33,
+    "latitude": 50.850105,
+    "longitude": 15.653749,
+    "address": {
+      "street": "",
+      "postalCode": "",
+      "city": "Jelenia Góra"
+    }
+  },
+  {
+    "id": "ph-10",
+    "firstName": "Krzysztof",
+    "lastName": "Golly",
+    "phone": "+48 511 038 634",
+    "salesPotential": 3.34,
+    "totalNetValue": 133363.0,
+    "latitude": 50.41201,
+    "longitude": 18.26138,
+    "address": {
+      "street": "",
+      "postalCode": "",
+      "city": "Zalesie Śląskie"
+    }
+  },
+  {
+    "id": "ph-11",
+    "firstName": "Mariusz",
+    "lastName": "Jakubas",
+    "phone": "+48 690 998 116",
+    "salesPotential": 2.94,
+    "totalNetValue": 117472.76,
+    "latitude": 49.883448,
+    "longitude": 19.492535,
+    "address": {
+      "street": "",
+      "postalCode": "",
+      "city": "Wadowice"
+    }
+  },
+  {
+    "id": "ph-12",
+    "firstName": "Piotr",
+    "lastName": "Knapik",
+    "phone": "+48 724 801 645",
+    "salesPotential": 2.48,
+    "totalNetValue": 99080.07,
+    "latitude": 51.366814,
+    "longitude": 20.109167,
+    "address": {
+      "street": "Kamilówka 24",
+      "postalCode": "26-332",
+      "city": "Sławno"
+    }
+  },
+  {
+    "id": "ph-13",
+    "firstName": "Miłosz",
+    "lastName": "Adamczyk",
+    "phone": "+48 504 490 623",
+    "salesPotential": 1.91,
+    "totalNetValue": 76082.65,
+    "latitude": 51.256909,
+    "longitude": 22.29006,
+    "address": {
+      "street": "",
+      "postalCode": "",
+      "city": "Miłocin Czajki"
+    }
+  },
+  {
+    "id": "ph-14",
+    "firstName": "Marcin",
+    "lastName": "Domański",
+    "phone": "+48 693 044 362",
+    "salesPotential": 1.81,
+    "totalNetValue": 72389.39,
+    "latitude": 51.771689,
+    "longitude": 20.234766,
+    "address": {
+      "street": "Ścieki 58",
+      "postalCode": "96-200",
+      "city": "Rawa Mazowiecka"
+    }
+  },
+  {
+    "id": "ph-15",
+    "firstName": "Piotr",
+    "lastName": "Tyrajski",
+    "phone": "+48 798 216 148",
+    "salesPotential": 1.54,
+    "totalNetValue": 61348.12,
+    "latitude": 52.439661,
+    "longitude": 19.383086,
+    "address": {
+      "street": "Solec 33",
+      "postalCode": "09-500",
+      "city": "Gostynin"
+    }
+  },
+  {
+    "id": "ph-16",
+    "firstName": "Maciej",
+    "lastName": "Przybył",
+    "phone": "",
+    "salesPotential": 1.33,
+    "totalNetValue": 52927.29,
+    "latitude": null,
+    "longitude": null,
+    "address": {
+      "street": "",
+      "postalCode": "",
+      "city": ""
+    }
+  },
+  {
+    "id": "ph-17",
+    "firstName": "Anna",
+    "lastName": "Łukaszka-Pawłowska",
+    "phone": "+48 600 433 473",
+    "salesPotential": 1.27,
+    "totalNetValue": 50584.42,
+    "latitude": 50.356602,
+    "longitude": 20.027691,
+    "address": {
+      "street": "",
+      "postalCode": "",
+      "city": "Miechów"
+    }
+  },
+  {
+    "id": "ph-18",
+    "firstName": "Marcin",
+    "lastName": "Aleksandrzak",
+    "phone": "+48 793 741 744",
+    "salesPotential": 1.08,
+    "totalNetValue": 42942.54,
+    "latitude": 51.768732,
+    "longitude": 19.456991,
+    "address": {
+      "street": "ul. Wygodna 5 m 2",
+      "postalCode": "94-024",
+      "city": "Łódź"
+    }
+  },
+  {
+    "id": "ph-19",
+    "firstName": "Radosław",
+    "lastName": "Cenkała",
+    "phone": "+48 721 049 320",
+    "salesPotential": 0.75,
+    "totalNetValue": 30024.34,
+    "latitude": 51.546641,
+    "longitude": 23.553219,
+    "address": {
+      "street": "",
+      "postalCode": "",
+      "city": "Włodawa"
+    }
+  },
+  {
+    "id": "ph-20",
+    "firstName": "Kamil",
+    "lastName": "Tecław",
+    "phone": "+48 691 469 748",
+    "salesPotential": 0.36,
+    "totalNetValue": 14522.59,
+    "latitude": 52.82098,
+    "longitude": 16.56299,
+    "address": {
+      "street": "Kamionka 75",
+      "postalCode": "64-720",
+      "city": "Lubasz"
+    }
+  },
+  {
+    "id": "ph-21",
+    "firstName": "Mirosław",
+    "lastName": "Skulski",
+    "phone": "+48 512 011 265",
+    "salesPotential": 0.35,
+    "totalNetValue": 14153.7,
+    "latitude": 51.323298,
+    "longitude": 15.746283,
+    "address": {
+      "street": "Osła 30",
+      "postalCode": "59-706",
+      "city": "Gromadka"
+    }
+  },
+  {
+    "id": "ph-22",
+    "firstName": "Kamil",
+    "lastName": "Pażniewski",
+    "phone": "+48 697 585 670",
+    "salesPotential": 0.28,
+    "totalNetValue": 11371.35,
+    "latitude": 52.73565,
+    "longitude": 19.03529,
+    "address": {
+      "street": "Rachcin 14",
+      "postalCode": "87-617",
+      "city": "Bobrowniki"
+    }
+  },
+  {
+    "id": "ph-23",
+    "firstName": "Jakub",
+    "lastName": "Saja",
+    "phone": "+48 723 207 548",
+    "salesPotential": 0.28,
+    "totalNetValue": 11145.69,
+    "latitude": 51.147537,
+    "longitude": 21.966415,
+    "address": {
+      "street": "ul. Stary Rynek 10",
+      "postalCode": "24-300",
+      "city": "Opole Lubelskie"
+    }
+  },
+  {
+    "id": "ph-24",
+    "firstName": "Patryk",
+    "lastName": "Szalkowski",
+    "phone": "+48 731 287 658",
+    "salesPotential": 0.27,
+    "totalNetValue": 10896.78,
+    "latitude": 53.65899,
+    "longitude": 19.2518,
+    "address": {
+      "street": "Klimy 46",
+      "postalCode": "14-220",
+      "city": "Kisielice"
+    }
+  },
+  {
+    "id": "ph-25",
+    "firstName": "Grzegorz",
+    "lastName": "Prokopczuk",
+    "phone": "+48 607 553 276",
+    "salesPotential": 0.27,
+    "totalNetValue": 10605.69,
+    "latitude": 50.608223,
+    "longitude": 16.775923,
+    "address": {
+      "street": "Olbrachcice Wielkie 8",
+      "postalCode": "57-200",
+      "city": "Ząbkowice Śląskie"
+    }
+  },
+  {
+    "id": "ph-26",
+    "firstName": "Radosław",
+    "lastName": "Struś",
+    "phone": "+48 601 411 009",
+    "salesPotential": 0.26,
+    "totalNetValue": 10523.1,
+    "latitude": 51.768732,
+    "longitude": 19.456991,
+    "address": {
+      "street": "ul. Podchorążych 142a",
+      "postalCode": "95-410",
+      "city": "Łódź"
+    }
+  },
+  {
+    "id": "ph-27",
+    "firstName": "Michał",
+    "lastName": "Zielonka",
+    "phone": "+48 732 733 290",
+    "salesPotential": 0.18,
+    "totalNetValue": 7333.83,
+    "latitude": 51.571033,
+    "longitude": 18.946677,
+    "address": {
+      "street": "Paprotnia 14A",
+      "postalCode": "98-161",
+      "city": "Zapolice"
+    }
+  },
+  {
+    "id": "ph-28",
+    "firstName": "Łukasz",
+    "lastName": "Jarosz",
+    "phone": "+48 509 540 936",
+    "salesPotential": 0.11,
+    "totalNetValue": 4563.68,
+    "latitude": 51.151013,
+    "longitude": 21.488952,
+    "address": {
+      "street": "Jawor Solecki 50",
+      "postalCode": "27-350",
+      "city": "Sienno"
+    }
+  },
+  {
+    "id": "ph-29",
+    "firstName": "Magdalena",
+    "lastName": "Januszewska",
+    "phone": "",
+    "salesPotential": 0.09,
+    "totalNetValue": 3574.89,
+    "latitude": null,
+    "longitude": null,
+    "address": {
+      "street": "",
+      "postalCode": "",
+      "city": ""
+    }
+  }
+]
