@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { BRANCH_PROFIT_ACCESS } from '@/lib/branchAccess';
+import { BRANCH_PROFIT_ACCESS, hasBranchProfitAccess } from '@/lib/branchAccess';
 
 // Hook do pobierania dostępnych lat
 const useAvailableYears = () => {
@@ -939,8 +939,14 @@ const selectStyles = {
     "BHP": "BHP" // Dla BHP nie ma potrzeby zmiany
   };
 
-  // Sprawdzenie uprawnień użytkownika
-  const canViewProfitData = userRole === 'ADMIN' || userRole === 'BOARD' || userRole === 'BRANCH';
+  // Sprawdzenie uprawnień użytkownika.
+  // BRANCH wchodzi TYLKO, gdy jego oddział jest na liście dostępu (@/lib/branchAccess) —
+  // ta sama bramka co w menu layoutu. Bez tego dowolny BRANCH, wpisując /profits-branch
+  // ręcznie, zobaczyłby swoją kartę (menu chowa link, ale nie chroni adresu).
+  const canViewProfitData =
+    userRole === 'ADMIN' ||
+    userRole === 'BOARD' ||
+    (userRole === 'BRANCH' && hasBranchProfitAccess(userBranch));
 
   // (onlyBranch jest teraz wartością pochodną liczoną przy renderze — patrz wyżej.
   //  Dawny useState + useEffect usunięty, by nie migotały karty na 1. renderze.)
