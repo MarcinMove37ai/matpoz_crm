@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { BRANCH_PROFIT_ACCESS } from '@/lib/branchAccess';
 
 // Hook do pobierania dostępnych lat
 const useAvailableYears = () => {
@@ -98,9 +99,10 @@ export type BranchProfitsCardProps = {
   branch: string;            // Nazwa oddziału
   bgColor?: string;          // Klasa tła – domyślnie "bg-gray-50"
   selectedYear?: number | null;    // Wybrany rok - dodane nowe pole
+  minYear?: number;          // Najmniejszy dostępny rok (z parent) — zamiast własnego /api/years
 };
 
-export const BranchProfitsCard: React.FC<BranchProfitsCardProps> = ({ branch, bgColor = "bg-gray-50", selectedYear }) => {
+export const BranchProfitsCard: React.FC<BranchProfitsCardProps> = ({ branch, bgColor = "bg-gray-50", selectedYear, minYear }) => {
   const formatMonthYear = (month: number, year: number): string => {
     return `${getMonthName(month)} ${year}`;
   };
@@ -121,7 +123,6 @@ export const BranchProfitsCard: React.FC<BranchProfitsCardProps> = ({ branch, bg
   const [yearlyData, setYearlyData] = useState<BranchProfitData | null>(null);
   const [currentMonthData, setCurrentMonthData] = useState<BranchProfitData | null>(null);
   const [historicalData, setHistoricalData] = useState<HistoricalBranchData[]>([]);
-  const { yearsData } = useAvailableYears();
 
   // Przygotowanie parametru oddziału do zapytań API
   const branchQuery = branch ? `&branch=${encodeURIComponent(branch)}` : '';
@@ -290,7 +291,8 @@ const renderHeader = () => {
   // Pobierz dane roczne - zaktualizowana aby używać roku z currentDate i uwzględniać saldo roku poprzedniego
   useEffect(() => {
     if (!currentDate) return;
-    if (!yearsData?.years?.length) return;
+    if (minYear === undefined) return;
+    const earliestYear = minYear; // number — uchwycony dla async-domknięcia (gwarantuje zawężenie typu)
 
     // Używamy selectedYear jeśli jest dostępny, w przeciwnym razie używamy currentDate.systemYear
     const yearToFetch = currentDate.year || currentDate.systemYear;
@@ -328,8 +330,7 @@ const renderHeader = () => {
     const fetchYearlyData = async () => {
       try {
         // Pobierz skumulowane saldo z poprzedniego roku (rekurencyjnie)
-        const minYear = Math.min(...yearsData.years);
-        const prevBalance = await fetchBalanceForYear(previousYear, minYear);
+        const prevBalance = await fetchBalanceForYear(previousYear, earliestYear);
         const previousYearBalance = prevBalance.balance;
         const previousYearBalancePaid = prevBalance.balancePaid;
 
@@ -403,7 +404,7 @@ const renderHeader = () => {
     };
 
     fetchYearlyData();
-  }, [currentDate, branchQuery, branch, yearsData]);
+  }, [currentDate, branchQuery, branch, minYear]);
 
   // Pobierz dane dla bieżącego miesiąca
   useEffect(() => {
@@ -838,12 +839,53 @@ const renderHeader = () => {
   );
 };
 
+// Mapowanie wartości oddziału z auth (różne formy/wielkość liter) na nazwę kanoniczną.
+// Poza komponentem — czysta stała, nie odtwarzana przy każdym renderze.
+const BRANCH_NAME_MAP: Record<string, string> = {
+  "pcim": "Pcim",
+  "lublin": "Lublin",
+  "rzgów": "Rzgów",
+  "rzgow": "Rzgów",
+  "malbork": "Malbork",
+  "łomża": "Łomża",
+  "lomza": "Łomża",
+  "myślibórz": "Myślibórz",
+  "mysliborz": "Myślibórz",
+  "mg": "MG",
+  "sth": "STH",
+  "bhp": "BHP",
+};
+
 // Główny komponent BranchProfitsView
 const BranchProfitsView: React.FC = () => {
-  const { userRole, userBranch } = useAuth();
-  const [onlyBranch, setOnlyBranch] = useState<string | null>(null);
+  const { userRole, userBranch, loading: authLoading } = useAuth();
+
+  // Czy bieżący użytkownik to oddział w trybie uproszczonym (ukryty selektor roku)?
+  // Lista dostępu współdzielona z layoutem (@/lib/branchAccess) — jeden punkt edycji.
+  const isRestricted =
+    userRole === 'BRANCH' &&
+    !!userBranch &&
+    BRANCH_PROFIT_ACCESS.includes(userBranch.toLowerCase());
+
+  // onlyBranch liczony SYNCHRONICZNIE z auth (zamiast useState + useEffect).
+  // Pierwszy render użytkownika-oddziału NIE przechodzi już gałęzią "wszystkie
+  // oddziały" — 6 kart nigdy się nie montuje (koniec lawiny /api/years, /api/date).
+  // ADMIN/BOARD → null (brak ograniczenia, render wszystkich kart jak dotąd).
+  const onlyBranch: string | null =
+    userRole === 'ADMIN' || userRole === 'BOARD'
+      ? null
+      : userBranch
+        ? BRANCH_NAME_MAP[userBranch.toLowerCase()] || userBranch
+        : null;
   const [selectedYear, setSelectedYear] = useState<number | undefined>(undefined);
   const { yearsData, loading: yearsLoading, error: yearsError } = useAvailableYears();
+
+  // Najmniejszy dostępny rok — liczony RAZ w parent i przekazywany do kart przez prop.
+  // KARTA nie musi już sama wołać /api/years (koniec duplikatu tego zapytania ORAZ
+  // dodatkowego przebiegu kaskady salda, który odpalał się, gdy karta domykała własny fetch).
+  const minYear =
+    yearsData?.years?.length ? Math.min(...yearsData.years) : undefined;
+
   const [reloadTrigger, setReloadTrigger] = useState<number>(0); // Nowy stan do wymuszenia przeładowania
   const [selectedBranchFilter, setSelectedBranchFilter] = useState<string | null>(null);
 
@@ -900,37 +942,8 @@ const selectStyles = {
   // Sprawdzenie uprawnień użytkownika
   const canViewProfitData = userRole === 'ADMIN' || userRole === 'BOARD' || userRole === 'BRANCH';
 
-  useEffect(() => {
-    // Jeśli rola to ADMIN lub BOARD, nie ograniczamy widoku
-    if (userRole === "ADMIN" || userRole === "BOARD") {
-      setOnlyBranch(null);
-      return;
-    }
-
-    if (userBranch) {
-      // Mapowanie nazw oddziałów jeśli potrzebne
-      const mapping: Record<string, string> = {
-        "pcim": "Pcim",
-        "lublin": "Lublin",
-        "rzgów": "Rzgów",
-        "rzgow": "Rzgów",
-        "malbork": "Malbork",
-        "łomża": "Łomża",
-        "lomza": "Łomża",
-        "myślibórz": "Myślibórz",
-        "mysliborz": "Myślibórz",
-        "mg": "MG",
-        "sth": "STH",
-        "bhp": "BHP"
-      };
-
-      // Normalizacja wartości oddziału
-      const branchKey = userBranch.toLowerCase();
-      setOnlyBranch(mapping[branchKey] || userBranch);
-    } else {
-      setOnlyBranch(null);
-    }
-  }, [userRole, userBranch]);
+  // (onlyBranch jest teraz wartością pochodną liczoną przy renderze — patrz wyżej.
+  //  Dawny useState + useEffect usunięty, by nie migotały karty na 1. renderze.)
 
   // Funkcja pomocnicza do ustalania koloru tła dla oddziału
   const getBgColorForBranch = (branch: string): string => {
@@ -956,6 +969,13 @@ const selectStyles = {
   const handleBranchFilterChange = (value: string) => {
     setSelectedBranchFilter(value === 'all' ? null : value);
   };
+  // Dopóki trwa ładowanie auth, nie renderujemy nic — bez tego pierwszy render
+  // (rola jeszcze nieznana) mógłby mignąć ekranem "Brak dostępu" albo zamontować
+  // karty, zanim wiemy, czy ograniczyć widok do jednego oddziału.
+  if (authLoading) {
+    return null;
+  }
+
   if (!canViewProfitData) {
     return (
       <Card className="w-full">
@@ -982,32 +1002,34 @@ const selectStyles = {
           <div className="flex justify-between items-center mb-4 sm:mb-0">
             <h2 className="text-xl font-semibold text-gray-800">Zyski Oddział</h2>
 
-            {/* WERSJA MOBILNA selektora roku (widoczny tylko na małych ekranach) */}
-            <div className="sm:hidden">
-              <Select
-                value={selectedYear?.toString() ?? yearsData?.currentYear?.toString()}
-                onValueChange={handleYearChange}
-              >
-                <SelectTrigger className={`${selectStyles.trigger} w-32`}>
-                  <SelectValue className={selectStyles.placeholder} placeholder="Wybierz rok" />
-                </SelectTrigger>
-                <SelectContent className={`${selectStyles.content} w-32`}>
-                  {yearsLoading ? (
-                    <SelectItem value="loading">Ładowanie lat...</SelectItem>
-                  ) : (
-                    yearsData?.years?.map((year) => (
-                      <SelectItem
-                        className={selectStyles.item}
-                        key={year}
-                        value={year.toString()}
-                      >
-                        {year}
-                      </SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
+            {/* WERSJA MOBILNA selektora roku (ukryta dla oddziałów w trybie uproszczonym) */}
+            {!isRestricted && (
+              <div className="sm:hidden">
+                <Select
+                  value={selectedYear?.toString() ?? yearsData?.currentYear?.toString()}
+                  onValueChange={handleYearChange}
+                >
+                  <SelectTrigger className={`${selectStyles.trigger} w-32`}>
+                    <SelectValue className={selectStyles.placeholder} placeholder="Wybierz rok" />
+                  </SelectTrigger>
+                  <SelectContent className={`${selectStyles.content} w-32`}>
+                    {yearsLoading ? (
+                      <SelectItem value="loading">Ładowanie lat...</SelectItem>
+                    ) : (
+                      yearsData?.years?.map((year) => (
+                        <SelectItem
+                          className={selectStyles.item}
+                          key={year}
+                          value={year.toString()}
+                        >
+                          {year}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
 
           {/* Kontener na filtry (selektor oddziału i desktopowy selektor roku) */}
@@ -1037,32 +1059,34 @@ const selectStyles = {
               </Select>
             )}
 
-            {/* WERSJA DESKTOPOWA selektora roku (ukryty na małych ekranach) */}
-            <div className="hidden sm:block">
-              <Select
-                value={selectedYear?.toString() ?? yearsData?.currentYear?.toString()}
-                onValueChange={handleYearChange}
-              >
-                <SelectTrigger className={`${selectStyles.trigger} w-full sm:w-32`}>
-                  <SelectValue className={selectStyles.placeholder} placeholder="Wybierz rok" />
-                </SelectTrigger>
-                <SelectContent className={`${selectStyles.content} w-full sm:w-32`}>
-                  {yearsLoading ? (
-                    <SelectItem value="loading">Ładowanie lat...</SelectItem>
-                  ) : (
-                    yearsData?.years?.map((year) => (
-                      <SelectItem
-                        className={selectStyles.item}
-                        key={year}
-                        value={year.toString()}
-                      >
-                        {year}
-                      </SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
+            {/* WERSJA DESKTOPOWA selektora roku (ukryta dla oddziałów w trybie uproszczonym) */}
+            {!isRestricted && (
+              <div className="hidden sm:block">
+                <Select
+                  value={selectedYear?.toString() ?? yearsData?.currentYear?.toString()}
+                  onValueChange={handleYearChange}
+                >
+                  <SelectTrigger className={`${selectStyles.trigger} w-full sm:w-32`}>
+                    <SelectValue className={selectStyles.placeholder} placeholder="Wybierz rok" />
+                  </SelectTrigger>
+                  <SelectContent className={`${selectStyles.content} w-full sm:w-32`}>
+                    {yearsLoading ? (
+                      <SelectItem value="loading">Ładowanie lat...</SelectItem>
+                    ) : (
+                      yearsData?.years?.map((year) => (
+                        <SelectItem
+                          className={selectStyles.item}
+                          key={year}
+                          value={year.toString()}
+                        >
+                          {year}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
         </div>
 
@@ -1074,13 +1098,19 @@ const selectStyles = {
         </div>
       </div>
 
-      {onlyBranch && userRole === "BRANCH" ? (
+      {selectedYear === undefined ? (
+        // Czekamy aż ustali się wybrany rok (po załadowaniu listy lat), zanim
+        // zamontujemy karty. Bez tej bramki karty montują się z selectedYear=undefined,
+        // a po ustaleniu roku re-renderują się i PONOWNIE odpalają całą kaskadę zapytań.
+        <div className="animate-pulse h-24 bg-gray-100 rounded-lg" />
+      ) : onlyBranch && userRole === "BRANCH" ? (
         // Jeśli użytkownik jest managerem oddziału, renderujemy tylko kartę tego oddziału
         <div className="space-y-8" key={`branch-${onlyBranch}-${reloadTrigger}`}>
           <BranchProfitsCard
             branch={onlyBranch}
             bgColor={getBgColorForBranch(onlyBranch)}
             selectedYear={selectedYear}
+            minYear={minYear}
           />
         </div>
       ) : (
@@ -1100,6 +1130,7 @@ const selectStyles = {
                     branch={branch}
                     bgColor={bgColor}
                     selectedYear={selectedYear}
+                    minYear={minYear}
                   />
                 </React.Fragment>
               );

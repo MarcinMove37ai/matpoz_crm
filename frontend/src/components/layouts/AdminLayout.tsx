@@ -13,7 +13,13 @@ import Cookies from 'js-cookie';
 // Import zminimalizowanego mechanizmu anulowania zapytań
 import { useEnhancedRequestCancellation } from '@/utils/enhancedFetchInterceptor';
 
-type UserRole = 'BOARD' | 'BRANCH' | 'REPRESENTATIVE' | 'ADMIN' | 'STAFF' | 'BASIA';
+// Lista dostępu do zakładki "Zyski (Oddział)" — współdzielona z komponentem widoku.
+import { hasBranchProfitAccess } from '@/lib/branchAccess';
+
+// 'BRANCH_PROFIT_ALLOW' to rola WIRTUALNA — nie pochodzi z auth.
+// Layout dokłada ją do zbioru ról użytkownika, gdy: rola BRANCH + oddział z listy
+// (@/lib/branchAccess). Służy tylko do odblokowania zakładki "Zyski (Oddział)".
+type UserRole = 'BOARD' | 'BRANCH' | 'REPRESENTATIVE' | 'ADMIN' | 'STAFF' | 'BASIA' | 'BRANCH_PROFIT_ALLOW';
 const userRoleDisplay = {
   'BOARD': '- ZARZĄD',
   'BRANCH': '- ODDZIAŁ',
@@ -88,7 +94,7 @@ const menuItems: MenuItem[] = [
     IconComponent: TrendingUp,
     label: 'Zyski (Oddział)',
     path: '/profits-branch',
-    roles: ['BOARD', 'ADMIN']
+    roles: ['BOARD', 'ADMIN', 'BRANCH_PROFIT_ALLOW']
   },
   {
     IconComponent: TrendingUp,
@@ -153,8 +159,19 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
 
   // Filtrujemy elementy menu na podstawie roli z kontekstu auth
   const userRoleFromAuth = (authUserRole || user?.['custom:role'] || 'BOARD') as UserRole;
+
+  // Zbiór ról EFEKTYWNYCH = rola bazowa + ewentualne role wirtualne.
+  // 'BRANCH_PROFIT_ALLOW' dokładamy, gdy: rola BRANCH ORAZ oddział jest na liście
+  // dostępu (@/lib/branchAccess). Rola bazowa zostaje, więc oddział NIE traci
+  // pozostałych zakładek (Sprzedaż, Koszty, Mapa...).
+  const effectiveRoles: UserRole[] = [userRoleFromAuth];
+  if (userRoleFromAuth === 'BRANCH' && hasBranchProfitAccess(authUserBranch)) {
+    effectiveRoles.push('BRANCH_PROFIT_ALLOW');
+  }
+
+  // Zakładka widoczna, jeśli KTÓRAKOLWIEK z jej ról należy do zbioru ról efektywnych.
   const filteredMenuItems = menuItems.filter(item =>
-    item.roles.includes(userRoleFromAuth)
+    item.roles.some(role => effectiveRoles.includes(role))
   );
 
   useEffect(() => {
