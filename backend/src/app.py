@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from routes.transactions import router as transactions_router
 from routes.costs import router as costs_router
+from routes.costs_raw import router as costs_raw_router
 from routes.users import router as users_router
 from routes.representatives import router as users_representatives
 from database import test_db_connection
@@ -136,6 +137,11 @@ app.include_router(
     costs_router,
     prefix="/api",
     tags=["costs"]
+)
+app.include_router(
+    costs_raw_router,
+    prefix="/api",
+    tags=["costs-iluo"]
 )
 app.include_router(
     users_router,

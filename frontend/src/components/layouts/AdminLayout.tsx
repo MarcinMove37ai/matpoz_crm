@@ -5,7 +5,7 @@ import React, { useState, ReactNode, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import type { LucideIcon } from 'lucide-react';
-import { BarChart3, ClipboardList, PiggyBank, TrendingUp, Map, Settings, Menu, X, Power, UserSearch, BarChart4, Flame, Ship, ChartNoAxesCombined, ChartPie, ChartBarStacked, Building, AlertCircle  } from 'lucide-react';
+import { BarChart3, ClipboardList, ClipboardPlus, PiggyBank, TrendingUp, Map, Settings, Menu, X, Power, UserSearch, BarChart4, Flame, Ship, ChartNoAxesCombined, ChartPie, ChartBarStacked, Building, AlertCircle  } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useCurrentDate } from '@/hooks/useCurrentDate';
 import Cookies from 'js-cookie';
@@ -71,6 +71,12 @@ const menuItems: MenuItem[] = [
     label: 'Lista kosztów',
     path: '/costs',
     roles: ['BOARD', 'BRANCH', 'REPRESENTATIVE', 'ADMIN', 'STAFF', 'BASIA']
+  },
+  {
+    IconComponent: ClipboardPlus,
+    label: 'Koszty ILUO (beta)',
+    path: '/costs-iluo',
+    roles: ['BOARD', 'ADMIN']
   },
   {
     IconComponent: ChartPie,
