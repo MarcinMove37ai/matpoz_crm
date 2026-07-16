@@ -40,7 +40,7 @@ ILUO_DATE_FILTER_ENABLED = True      # przed produkcją -> True
 ILUO_REQUIRE_LABEL = True            # przed produkcją -> True
 
 # Kwota przenoszona do all_costs.cost_value przy przypisaniu: "netto" | "brutto"
-ILUO_ASSIGN_AMOUNT = "netto"
+ILUO_ASSIGN_AMOUNT = "brutto"
 
 # Stałe zapisu do all_costs dla kosztów z ILUO:
 # - cost_kind = nazwa pozycji dokumentu (wszystkie pozycje muszą mieć tę samą
