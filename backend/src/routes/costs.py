@@ -7,6 +7,7 @@ import logging
 from typing import List, Optional
 
 from models.transaction import AllCosts, ConfigCurrentDate, CostKind, CostAuditLog
+from models.costs_raw import CostsRaw  # KROK 4d: odpinanie dokumentu ILUO przy usunięciu kosztu
 from database import get_db
 from pydantic import BaseModel
 
@@ -167,6 +168,22 @@ async def update_cost(cost_id: int, cost: CostCreate, db: Session = Depends(get_
         db_cost = db.query(AllCosts).filter(AllCosts.cost_id == cost_id).first()
         if not db_cost:
             raise HTTPException(status_code=404, detail="Nie znaleziono kosztu o podanym ID")
+
+        # --- KROK 4e/4f: koszty z dokumentów ILUO są nieedytowalne ---
+        # Rozpoznanie: powiązanie w costs_raw (assigned_cost_id) lub znacznik
+        # cost_4what='ILUO'. Jedyna ścieżka korekty: usunięcie kosztu (dokument
+        # ILUO wraca do puli dzięki odpięciu w DELETE) i ponowne przypisanie.
+        is_iluo_cost = (
+            db_cost.cost_4what == 'ILUO'
+            or db.query(CostsRaw).filter(CostsRaw.assigned_cost_id == cost_id).first() is not None
+        )
+        if is_iluo_cost:
+            raise HTTPException(
+                status_code=403,
+                detail="Koszt pochodzi z dokumentu ILUO i jest nieedytowalny. "
+                       "Aby skorygować, usuń koszt (dokument wróci do puli) i przypisz ponownie."
+            )
+        # --- KONIEC KROKU 4e/4f ---
 
         # Sprawdź czy istnieje podany rodzaj kosztu
         cost_kind = db.query(CostKind).filter(CostKind.kind == cost.cost_kind).first()
@@ -780,6 +797,9 @@ async def delete_cost(
 ):
     """
     Usuwa koszt o podanym ID z bazy danych.
+    KROK 4d: jeśli koszt pochodził z przypisania dokumentu ILUO, dokument
+    zostaje odpięty (assigned_* -> NULL) w TEJ SAMEJ transakcji i wraca
+    do puli "do przypisania".
     """
     try:
         cost = db.query(AllCosts).filter(AllCosts.cost_id == cost_id).first()
@@ -811,6 +831,17 @@ async def delete_cost(
         )
         db.add(audit_entry)
         # --- KONIEC AUDIT LOG ---
+
+        # --- KROK 4d: odepnij dokument(y) ILUO wskazujące na ten koszt ---
+        unassigned = db.query(CostsRaw).filter(
+            CostsRaw.assigned_cost_id == cost_id
+        ).update(
+            {"assigned_cost_id": None, "assigned_at": None, "assigned_by": None},
+            synchronize_session=False,
+        )
+        if unassigned:
+            logger.info(f"Odpięto {unassigned} dokument(y) ILUO od usuwanego kosztu {cost_id}")
+        # --- KONIEC KROKU 4d ---
 
         db.delete(cost)
         db.commit()
