@@ -1,55 +1,32 @@
 /**
  * @file src/lib/branchDictionary.ts
- * @description Wspólny słownik oddziałów dla modułów kosztów.
+ * @description Słownik etykiet oddziałów dla modułów kosztów.
  *
- * ŹRÓDŁO PRAWDY OODDZIAŁU: prefiks w numerze dokumentu (np. "FZ RZG/..." -> Rzgów).
- * Pole punkt_handlowy z ERP bywa mylące (np. dokument RZG ma punkt_handlowy "MAT-POŻ"),
- * dlatego oddział wyznaczamy z numeru, a punkt_handlowy służy TYLKO jako fallback,
- * gdy prefiksu nie ma w słowniku.
+ * KROK 2b (audyt 2026-07): ŹRÓDŁEM PRAWDY oddziału jest BACKEND
+ * (routes/costs_raw.py). API zwraca:
+ *   - oddzial          -> KOD legacy (all_costs.cost_branch), np. "Pcim", "HQ"
+ *   - oddzial_display  -> nazwa prezentacyjna wiersza, np. "Sklep internetowy"
  *
- * Nazwy docelowe są zgodne ze słownikiem cost_branch z tabeli all_costs
- * (ten sam, którego używa CostsView), aby interpretacja była identyczna.
+ * Front NIE wyznacza już oddziału z numeru dokumentu ani z punkt_handlowy.
+ * Ten plik utrzymuje wyłącznie mapkę KOD -> ETYKIETA na potrzeby elementów
+ * UI, które operują na kodach (np. dropdown filtra zasilany z /branches).
+ * Mapowanie zgodne z getBranchDisplayName z CostsView (legacy).
  */
 
-// Prefiks numeru dokumentu -> kanoniczna nazwa oddziału (cost_branch)
-export const BRANCH_PREFIX_MAP: Record<string, string> = {
-  RZG: 'Rzgów',
-  MAL: 'Malbork',
-  PCI: 'Pcim',
-  LOM: 'Łomża',
-  MYS: 'Myślibórz',
-  LUB: 'Lublin',
-  MG: 'Centrala',   // MG w dokumencie = centrala (HQ)
-  STH: 'Serwis',    // STH w dokumencie = serwis
+// KOD legacy (all_costs.cost_branch) -> etykieta w UI
+export const BRANCH_CODE_DISPLAY: Record<string, string> = {
+  HQ: 'Centrala',
+  STH: 'Serwis',
+  Private: 'Prywatny',
+  MG: 'Interent', // pisownia spójna z legacy CostsView; obejmuje sklep internetowy (INT)
 };
 
 /**
- * Wyciąga prefiks oddziału z numeru dokumentu.
- * Obsługuje faktury (FZ) i korekty (KFZ).
- * Przykłady: "FZ RZG/26/01/0008" -> "RZG", "KFZ LOM/25/11/0002" -> "LOM".
- * Zwraca null, gdy numer nie pasuje do wzorca.
+ * Etykieta UI dla kodu oddziału legacy.
+ * Kody bez wpisu w mapie (Pcim, Rzgów, Malbork, Lublin, Łomża, Myślibórz, BHP)
+ * wyświetlają się wprost.
  */
-export function extractBranchPrefix(numer: string | null | undefined): string | null {
-  if (!numer) return null;
-  const match = numer.match(/^K?FZ\s+([A-ZŁ]+)\//);
-  return match ? match[1] : null;
-}
-
-/**
- * Wyznacza nazwę oddziału dla dokumentu kosztowego.
- * 1. Prefiks z numeru -> nazwa ze słownika (źródło prawdy).
- * 2. Fallback: surowy punkt_handlowy (gdy prefiks nieznany lub brak).
- * 3. Ostatecznie '-' gdy nie ma żadnej informacji.
- */
-export function resolveBranchName(
-  numer: string | null | undefined,
-  punktHandlowy: string | null | undefined,
-): string {
-  const prefix = extractBranchPrefix(numer);
-  if (prefix && BRANCH_PREFIX_MAP[prefix]) {
-    return BRANCH_PREFIX_MAP[prefix];
-  }
-  // Fallback na punkt_handlowy (nierozpoznany prefiks)
-  const fallback = (punktHandlowy || '').trim();
-  return fallback !== '' ? fallback : '-';
+export function getBranchDisplayName(branchCode: string | null | undefined): string {
+  if (!branchCode) return '-';
+  return BRANCH_CODE_DISPLAY[branchCode] || branchCode;
 }

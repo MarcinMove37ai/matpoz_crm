@@ -67,17 +67,18 @@ const menuItems: MenuItem[] = [
     roles: ['BOARD', 'BRANCH', 'REPRESENTATIVE', 'ADMIN']
   },
   {
+    IconComponent: ClipboardPlus,
+    label: 'Koszty z ILUO',
+    path: '/costs-iluo',
+    roles: ['BOARD', 'ADMIN', 'BRANCH']
+  },
+  {
     IconComponent: ClipboardList,
     label: 'Lista kosztów',
     path: '/costs',
     roles: ['BOARD', 'BRANCH', 'REPRESENTATIVE', 'ADMIN', 'STAFF', 'BASIA']
   },
-  {
-    IconComponent: ClipboardPlus,
-    label: 'Koszty ILUO (beta)',
-    path: '/costs-iluo',
-    roles: ['BOARD', 'ADMIN']
-  },
+
   {
     IconComponent: ChartPie,
     label: 'Podział kosztów',

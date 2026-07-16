@@ -58,6 +58,15 @@ const getBranchDisplayName = (branch: string): string => {
   return branch;
 };
 
+// KROK 6: prowizja przypisana z ILUO — w bazie cost_kind='Wypłata' (mechanika
+// liczenia), w UI konsekwentnie "Prowizja - KOSZT" (znacznik cost_4what='ILUO')
+const displayCostKind = (cost: { cost_kind: string; cost_4what: string }): string =>
+  cost.cost_kind === 'Wypłata' && cost.cost_4what === 'ILUO' ? 'Prowizja - KOSZT' : cost.cost_kind;
+
+// KROK 6: funkcja "Powiel" ukryta (koszty fakturowe wchodzą przez ILUO);
+// kod zostaje — przywrócenie = zmiana flagi na true
+const SHOW_DUPLICATE_BUTTON = false;
+
 // Stałe dla filtrów
 const monthNames = [
   "Styczeń", "Luty", "Marzec", "Kwiecień", "Maj", "Czerwiec",
@@ -818,6 +827,10 @@ const CostsView = () => {
     if (selectedCosts.length === 1) {
       const costId = selectedCosts[0];
       const costToEdit = sortedCosts.find(cost => cost.cost_id === costId) || null;
+      // KROK 4e/4f: koszt z ILUO jest nieedytowalny (dodatkowa zapora obok wygaszonego przycisku)
+      if (costToEdit?.cost_4what === 'ILUO') {
+        return;
+      }
       setCostToEdit(costToEdit);
       setIsEditDialogOpen(true);
     }
@@ -856,7 +869,14 @@ const CostsView = () => {
     return editableCosts.length > 0 && selectedCosts.length === editableCosts.length;
   }, [sortedCosts, selectedCosts, isRepresentative, userRole]);
 
-  const isEditButtonEnabled = selectedCosts.length === 1 && canEdit;
+  // KROK 4e/4f: koszt z ILUO jest nieedytowalny — znacznikiem jest
+  // cost_4what='ILUO' (cost_kind niesie nazwę pozycji dokumentu)
+  const isSelectedIluoCost = useMemo(() => {
+    if (selectedCosts.length !== 1) return false;
+    return sortedCosts.find(cost => cost.cost_id === selectedCosts[0])?.cost_4what === 'ILUO';
+  }, [selectedCosts, sortedCosts]);
+
+  const isEditButtonEnabled = selectedCosts.length === 1 && canEdit && !isSelectedIluoCost;
   const isDeleteButtonEnabled = selectedCosts.length > 0 && canDelete;
 
   useEffect(() => {
@@ -1077,6 +1097,8 @@ const CostsView = () => {
                             title={
                             !canEdit
                                 ? 'Nie masz uprawnień do edycji kosztów'
+                                : isSelectedIluoCost
+                                ? 'Koszt z dokumentu ILUO jest nieedytowalny — usuń go i przypisz dokument ponownie'
                                 : selectedCosts.length === 0
                                 ? 'Zaznacz koszt, aby go edytować'
                                 : selectedCosts.length > 1
@@ -1259,6 +1281,23 @@ const CostsView = () => {
               </Alert>
             )}
 
+            {/* KROK 4e: monit z procedurą przy zaznaczonym koszcie ILUO */}
+            {isSelectedIluoCost && (
+              <Alert className="mb-4 border-blue-300 bg-blue-50 text-blue-900">
+                <AlertDescription>
+                  <div className="flex items-center gap-3">
+                    <AlertCircle className="h-5 w-5 text-blue-600 shrink-0" />
+                    <span>
+                      Zaznaczony koszt pochodzi z dokumentu ILUO i jest <strong>nieedytowalny</strong>.
+                      Aby skorygować dane: usuń koszt (przycisk „Usuń”) — dokument automatycznie wróci
+                      do puli „Do przypisania” w widoku <strong>Koszty z ILUO</strong> — a następnie
+                      przypisz go ponownie z właściwymi ustawieniami.
+                    </span>
+                  </div>
+                </AlertDescription>
+              </Alert>
+            )}
+
             <div className="bg-white rounded-md border border-gray-200 overflow-x-auto">
               <Table className="min-w-full table-fixed">
                 <TableHeader>
@@ -1319,7 +1358,7 @@ const CostsView = () => {
                       Oddział
                     </SortableHeader>
                     {/* Dodatkowa komórka na przycisk Powiel */}
-                    {canAdd && !isRepresentative && (
+                    {SHOW_DUPLICATE_BUTTON && canAdd && !isRepresentative && (
                         <TableHead className="w-[80px] font-medium text-gray-800 text-center">Powiel</TableHead>
                     )}
                   </TableRow>
@@ -1400,7 +1439,7 @@ const CostsView = () => {
                           )}
 
                           <TableCell className="text-gray-800 text-center truncate px-2">
-                            {cost.cost_kind}
+                            {displayCostKind(cost)}
                           </TableCell>
                           <TableCell className="text-gray-800 text-center truncate px-2">
                             {cost.cost_4what}
@@ -1430,7 +1469,7 @@ const CostsView = () => {
                                 {getBranchDisplayName(cost.cost_branch)} {/* Zastosuj funkcję mapującą */}
                               </span>
                           </TableCell>
-                          {canAdd && !isRepresentative && (
+                          {SHOW_DUPLICATE_BUTTON && canAdd && !isRepresentative && (
                               <TableCell className="text-center">
                                 <Button
                                   onClick={() => handleDuplicateCost(cost)}
@@ -1474,7 +1513,7 @@ const CostsView = () => {
                           <TableCell className="text-center text-gray-700">
                             {costsSummary.count} poz.
                           </TableCell>
-                          {canAdd && !isRepresentative && (
+                          {SHOW_DUPLICATE_BUTTON && canAdd && !isRepresentative && (
                             <TableCell className="text-center text-gray-700">-</TableCell>
                           )}
                         </TableRow>

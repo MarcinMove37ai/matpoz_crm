@@ -1,12 +1,15 @@
 /**
  * @file src/components/views/CostsViewIluo.tsx
  * @description Widok "Koszty ILUO (beta)" — lista dokumentów z costs_raw (ERP).
- *              Różnica względem CostsView: klik w wiersz otwiera modal ze
- *              szczegółami dokumentu (pozycje dociągane na żądanie).
  *
- * Strategia wydajności (skala: tysiące dokumentów):
- * - lista pobiera tylko nagłówki, paginowane (limit/offset),
- * - pozycje ładowane dopiero po kliknięciu, z cache w pamięci komponentu.
+ * KROK 2b: oddział z backendu (kod + nazwa), filtr na kodach.
+ * KROK 3:  przełącznik etykiety chowany, gdy backend wymusza etykietę.
+ * KROK 4c: sekcja "Przypisanie kosztu" w modalu szczegółów:
+ *          - selecty Właściciel + Przedstawiciel (poziomo), badge oddziału,
+ *          - reguły jak AddCostDialog (Przedstawiciel => PH wymagany,
+ *            Oddział/Centrala => PH zablokowany),
+ *          - dokument przypisany => zielona plakietka statusu zamiast formularza,
+ *          - po sukcesie odświeżenie listy i nagłówka w modalu.
  */
 
 "use client"
@@ -26,13 +29,15 @@ import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   AlertCircle, X, ChevronUp, ChevronDown, ChevronsUpDown, Loader2,
-  Building2, Hash, Receipt, Package, Tag, CalendarDays
+  Hash, Receipt, Package, Tag, CalendarDays, Check
 } from 'lucide-react';
 import {
   costsRawService,
   CostRawHeader,
   CostRawDetail,
 } from '@/services/costsRaw';
+import { getBranchDisplayName } from '@/lib/branchDictionary';
+import { useAuth } from '@/hooks/useAuth';
 
 // Sortowanie — pola zgodne z białą listą w backendzie
 type SortColumn = 'data' | 'numer' | 'nazwa_skrocona' | 'netto' | 'brutto' | 'oddzial';
@@ -41,7 +46,59 @@ type SortDir = 'asc' | 'desc';
 // Filtr przypisania etykiety
 type LabelFilter = 'all' | 'with' | 'without';
 
+// Filtr statusu przypisania — domyślnie lista robocza "do przypisania"
+type AssignFilter = 'unassigned' | 'assigned' | 'all';
+
+// Właściciele kosztu przy przypisaniu (jak AddCostDialog, bez "Prywatny")
+const COST_OWNERS = ['Wspólny', 'Oddział', 'Centrala', 'Przedstawiciel'];
+// Dokument prowizyjny (Prowizja - KOSZT): tylko Oddział/Przedstawiciel
+const COMMISSION_COST_OWNERS = ['Oddział', 'Przedstawiciel'];
+// Właściciele, przy których select PH jest zablokowany
+const OWNERS_WITHOUT_PH = ['Oddział', 'Centrala'];
+
+// Kolory badge'y oddziałów — spójne z legacy CostsView (klucz = KOD legacy)
+const branchBadgeClass = (code: string | null): string => {
+  switch (code) {
+    case 'MG': return 'bg-red-100 text-red-800';
+    case 'STH': return 'bg-purple-100 text-purple-800';
+    case 'BHP': return 'bg-yellow-100 text-yellow-800';
+    case 'Pcim': return 'bg-green-100 text-green-800';
+    case 'Rzgów': return 'bg-blue-100 text-blue-800';
+    case 'Private': return 'bg-orange-100 text-orange-800';
+    default: return 'bg-blue-100 text-blue-800';
+  }
+};
+
+// Normalizacja nazwy oddziału użytkownika na kod legacy (jak w AddCostDialog)
+const BRANCH_NORMALIZE: Record<string, string> = {
+  "LUBLIN": "Lublin",
+  "PCIM": "Pcim",
+  "RZGOW": "Rzgów",
+  "RZGÓW": "Rzgów",
+  "MALBORK": "Malbork",
+  "LOMZA": "Łomża",
+  "ŁOMŻA": "Łomża",
+  "LOMŻA": "Łomża",
+  "MYSLIBORZ": "Myślibórz",
+  "MYŚLIBÓRZ": "Myślibórz",
+};
+
 const CostsViewIluo = () => {
+  const { user, userRole, userBranch } = useAuth();
+
+  // KROK 5 (korekta): ADMIN i BOARD widzą WSZYSTKO (z HQ/IIM/INT) i przypisują;
+  // BRANCH widzi tylko swój oddział i przypisuje; REPRESENTATIVE, BASIA, STAFF
+  // — bez dostępu (menu chowa link, zapora niżej łapie wejście z URL).
+  const isAdmin = userRole === 'ADMIN';
+  const isBoard = userRole === 'BOARD';
+  const isBranchRole = userRole === 'BRANCH';
+  const hasAccess = isAdmin || isBoard || isBranchRole;
+  const normalizedUserBranch = userBranch
+    ? (BRANCH_NORMALIZE[userBranch.toUpperCase()] || userBranch)
+    : null;
+  // BRANCH: wymuszony filtr własnego oddziału (dropdown zablokowany)
+  const forcedBranch = isBranchRole ? normalizedUserBranch : null;
+
   // --- Dane listy ---
   const [rows, setRows] = useState<CostRawHeader[]>([]);
   const [loading, setLoading] = useState(true);
@@ -54,10 +111,14 @@ const CostsViewIluo = () => {
     offset: 0,
   });
 
+  // Flaga z backendu: etykieta wymuszona => chowamy przełącznik etykiety
+  const [labelRequired, setLabelRequired] = useState(false);
+
   // --- Filtry / sortowanie ---
   const [searchNazwa, setSearchNazwa] = useState('');
   const [debouncedNazwa, setDebouncedNazwa] = useState('');
   const [labelFilter, setLabelFilter] = useState<LabelFilter>('all');
+  const [assignFilter, setAssignFilter] = useState<AssignFilter>('unassigned');
   const [selectedBranch, setSelectedBranch] = useState<string>('all');
   const [branchOptions, setBranchOptions] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState<SortColumn>('data');
@@ -68,6 +129,13 @@ const CostsViewIluo = () => {
   const [detail, setDetail] = useState<CostRawDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
+
+  // --- Przypisanie (krok 4c) ---
+  const [assignOwner, setAssignOwner] = useState('');
+  const [assignPh, setAssignPh] = useState('');
+  const [assignLoading, setAssignLoading] = useState(false);
+  const [assignError, setAssignError] = useState<string | null>(null);
+  const [representatives, setRepresentatives] = useState<string[]>([]);
 
   // Cache pozycji: id dokumentu -> szczegóły (drugie otwarcie = natychmiast)
   const detailCache = useRef<Map<number, CostRawDetail>>(new Map());
@@ -106,8 +174,9 @@ const CostsViewIluo = () => {
 
       const data = await costsRawService.getList({
         szukaj: debouncedNazwa || undefined,
-        oddzial: selectedBranch === 'all' ? undefined : selectedBranch,
+        oddzial: forcedBranch || (selectedBranch === 'all' ? undefined : selectedBranch),
         ma_etykiete: labelFilter === 'all' ? undefined : labelFilter === 'with',
+        przypisane: assignFilter === 'all' ? undefined : assignFilter === 'assigned',
         sort_by: sortBy,
         sort_dir: sortDir,
         limit: pagination.limit,
@@ -115,6 +184,7 @@ const CostsViewIluo = () => {
       });
 
       setRows(data.data);
+      setLabelRequired(data.require_label === true);
       setPagination(prev => ({
         ...prev,
         total: data.total,
@@ -129,13 +199,13 @@ const CostsViewIluo = () => {
     } finally {
       setLoading(false);
     }
-  }, [debouncedNazwa, selectedBranch, labelFilter, sortBy, sortDir, pagination.limit, pagination.offset]);
+  }, [debouncedNazwa, selectedBranch, forcedBranch, labelFilter, assignFilter, sortBy, sortDir, pagination.limit, pagination.offset]);
 
   useEffect(() => {
     fetchList();
   }, [fetchList]);
 
-  // Lista oddziałów do dropdownu — raz, niezależnie od filtrów
+  // Lista KODÓW oddziałów do dropdownu — raz, niezależnie od filtrów
   useEffect(() => {
     let active = true;
     costsRawService.getBranches()
@@ -144,10 +214,27 @@ const CostsViewIluo = () => {
     return () => { active = false; };
   }, []);
 
+  // Lista przedstawicieli — BRANCH pobiera tylko swój oddział (jak AddCostDialog)
+  useEffect(() => {
+    let active = true;
+    const endpoint = isBranchRole && normalizedUserBranch
+      ? `/api/representatives?branch=${encodeURIComponent(normalizedUserBranch)}`
+      : '/api/representatives';
+    fetch(endpoint)
+      .then(res => res.json())
+      .then(data => {
+        if (active && Array.isArray(data)) {
+          setRepresentatives(data.map((rep: any) => rep.representative_name).filter(Boolean));
+        }
+      })
+      .catch(err => console.error('Błąd podczas pobierania przedstawicieli:', err));
+    return () => { active = false; };
+  }, [isBranchRole, normalizedUserBranch]);
+
   // Reset paginacji przy zmianie filtra/sortowania
   useEffect(() => {
     setPagination(prev => ({ ...prev, offset: 0 }));
-  }, [debouncedNazwa, selectedBranch, labelFilter, sortBy, sortDir]);
+  }, [debouncedNazwa, selectedBranch, labelFilter, assignFilter, sortBy, sortDir]);
 
   // Sortowanie po kliknięciu nagłówka
   const handleSort = (column: SortColumn) => {
@@ -184,6 +271,9 @@ const CostsViewIluo = () => {
   const openDetail = useCallback(async (id: number) => {
     setIsModalOpen(true);
     setDetailError(null);
+    setAssignError(null);
+    setAssignOwner('');
+    setAssignPh('');
 
     const cached = detailCache.current.get(id);
     if (cached) {
@@ -210,6 +300,9 @@ const CostsViewIluo = () => {
     setIsModalOpen(false);
     setDetail(null);
     setDetailError(null);
+    setAssignError(null);
+    setAssignOwner('');
+    setAssignPh('');
   }, []);
 
   // Zamknięcie modala klawiszem Esc
@@ -222,6 +315,71 @@ const CostsViewIluo = () => {
     return () => window.removeEventListener('keydown', onKey);
   }, [isModalOpen, closeModal]);
 
+  // Zmiana właściciela — czyści/blokuje PH wg reguł AddCostDialog
+  const handleOwnerChange = (value: string) => {
+    setAssignOwner(value);
+    setAssignError(null);
+    if (OWNERS_WITHOUT_PH.includes(value)) {
+      setAssignPh('');
+    }
+  };
+
+  const isPhDisabled = !assignOwner || OWNERS_WITHOUT_PH.includes(assignOwner);
+
+  // Wysłanie przypisania
+  const handleAssign = async () => {
+    if (!detail) return;
+    setAssignError(null);
+
+    if (!assignOwner) {
+      setAssignError('Wybierz właściciela kosztu.');
+      return;
+    }
+    if (assignOwner === 'Przedstawiciel' && !assignPh) {
+      setAssignError('Dla właściciela "Przedstawiciel" wybierz przedstawiciela.');
+      return;
+    }
+
+    const author = user?.fullName || user?.username || '';
+    if (!author) {
+      setAssignError('Brak zalogowanego użytkownika — nie można przypisać.');
+      return;
+    }
+
+    try {
+      setAssignLoading(true);
+      const result = await costsRawService.assign(detail.header.id, {
+        cost_own: assignOwner,
+        cost_ph: assignPh || null,
+        author,
+      });
+
+      // Zaktualizuj nagłówek w modalu i w cache (bez ponownego fetchu)
+      const updated: CostRawDetail = {
+        ...detail,
+        header: {
+          ...detail.header,
+          assigned_cost_id: result.cost_id,
+          assigned_at: result.assigned_at,
+          assigned_by: author,
+        },
+      };
+      setDetail(updated);
+      detailCache.current.set(detail.header.id, updated);
+
+      // Odśwież listę; przy filtrze "Do przypisania" dokument znika z listy,
+      // więc zamykamy modal — plakietkę statusu widać w widoku "Przypisane"
+      fetchList();
+      if (assignFilter === 'unassigned') {
+        closeModal();
+      }
+    } catch (err) {
+      setAssignError(err instanceof Error ? err.message : 'Wystąpił błąd podczas przypisywania kosztu.');
+    } finally {
+      setAssignLoading(false);
+    }
+  };
+
   const totalPages = Math.ceil(pagination.total / pagination.limit) || 1;
   const currentPage = Math.floor(pagination.offset / pagination.limit) + 1;
 
@@ -232,6 +390,19 @@ const CostsViewIluo = () => {
   const sumNetto = detail
     ? detail.pozycje.reduce((s, p) => s + (p.ilosc ?? 0) * (p.cena ?? 0), 0)
     : 0;
+
+  // KROK 5: zapora dla ról bez dostępu (menu chowa link, to łapie wejście z URL)
+  if (!hasAccess) {
+    return (
+      <Card>
+        <CardContent className="p-10 text-center">
+          <AlertCircle className="h-8 w-8 text-gray-400 mx-auto mb-3" />
+          <p className="text-gray-600 font-medium">Brak dostępu do widoku Koszty z ILUO</p>
+          <p className="text-sm text-gray-400 mt-1">Widok dostępny dla zarządu, administratora i oddziałów.</p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -263,21 +434,21 @@ const CostsViewIluo = () => {
                 )}
               </div>
 
-              {/* Filtr etykiety — segmentowy przełącznik */}
+              {/* Filtr statusu przypisania — domyślnie lista robocza "do przypisania" */}
               <div className="inline-flex h-11 rounded-lg border-2 border-gray-200 overflow-hidden bg-white">
                 {([
+                  { key: 'unassigned', label: 'Do przypisania' },
+                  { key: 'assigned', label: 'Przypisane' },
                   { key: 'all', label: 'Wszystkie' },
-                  { key: 'with', label: 'Z etykietą' },
-                  { key: 'without', label: 'Bez etykiety' },
-                ] as { key: LabelFilter; label: string }[]).map((opt, idx) => (
+                ] as { key: AssignFilter; label: string }[]).map((opt, idx) => (
                   <button
                     key={opt.key}
                     type="button"
-                    onClick={() => setLabelFilter(opt.key)}
+                    onClick={() => setAssignFilter(opt.key)}
                     className={`px-3 text-sm font-medium transition-colors duration-200 ${
                       idx > 0 ? 'border-l-2 border-gray-200' : ''
                     } ${
-                      labelFilter === opt.key
+                      assignFilter === opt.key
                         ? 'bg-blue-600 text-white'
                         : 'text-gray-600 hover:bg-gray-50'
                     }`}
@@ -287,19 +458,56 @@ const CostsViewIluo = () => {
                 ))}
               </div>
 
-              {/* Filtr oddziału */}
+              {/* Filtr etykiety — ukryty, gdy backend wymusza etykietę (produkcja) */}
+              {!labelRequired && (
+                <div className="inline-flex h-11 rounded-lg border-2 border-gray-200 overflow-hidden bg-white">
+                  {([
+                    { key: 'all', label: 'Wszystkie' },
+                    { key: 'with', label: 'Z etykietą' },
+                    { key: 'without', label: 'Bez etykiety' },
+                  ] as { key: LabelFilter; label: string }[]).map((opt, idx) => (
+                    <button
+                      key={opt.key}
+                      type="button"
+                      onClick={() => setLabelFilter(opt.key)}
+                      className={`px-3 text-sm font-medium transition-colors duration-200 ${
+                        idx > 0 ? 'border-l-2 border-gray-200' : ''
+                      } ${
+                        labelFilter === opt.key
+                          ? 'bg-blue-600 text-white'
+                          : 'text-gray-600 hover:bg-gray-50'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Filtr oddziału — BRANCH ma zablokowany własny oddział */}
               <div className="relative w-full sm:w-56">
                 <select
-                  value={selectedBranch}
+                  value={forcedBranch || selectedBranch}
                   onChange={(e) => setSelectedBranch(e.target.value)}
-                  className={`h-11 w-full border-gray-200 border-2 rounded-lg text-gray-800 px-3 pr-8 appearance-none cursor-pointer transition-colors duration-200 ${
-                    selectedBranch !== 'all' ? 'bg-green-50' : 'bg-white'
+                  disabled={isBranchRole}
+                  className={`h-11 w-full border-gray-200 border-2 rounded-lg px-3 pr-8 appearance-none transition-colors duration-200 ${
+                    isBranchRole
+                      ? 'bg-gray-100 text-gray-500 cursor-not-allowed'
+                      : selectedBranch !== 'all'
+                        ? 'bg-green-50 text-gray-800 cursor-pointer'
+                        : 'bg-white text-gray-800 cursor-pointer'
                   }`}
                 >
-                  <option value="all">Wszystkie oddziały</option>
-                  {branchOptions.map((branch) => (
-                    <option key={branch} value={branch}>{branch.trim()}</option>
-                  ))}
+                  {isBranchRole && forcedBranch ? (
+                    <option value={forcedBranch}>{getBranchDisplayName(forcedBranch)}</option>
+                  ) : (
+                    <>
+                      <option value="all">Wszystkie oddziały</option>
+                      {branchOptions.map((branch) => (
+                        <option key={branch} value={branch}>{getBranchDisplayName(branch)}</option>
+                      ))}
+                    </>
+                  )}
                 </select>
                 <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
               </div>
@@ -357,20 +565,29 @@ const CostsViewIluo = () => {
                   rows.map((row) => (
                     <TableRow
                       key={row.id}
-                      className="cursor-pointer hover:bg-blue-50 transition-colors"
+                      className={`cursor-pointer transition-colors ${
+                        row.prowizja ? 'bg-yellow-50 hover:bg-yellow-100' : 'hover:bg-blue-50'
+                      }`}
                       onClick={() => openDetail(row.id)}
-                      title="Kliknij, aby zobaczyć pozycje"
+                      title={row.prowizja ? 'Dokument prowizyjny — kliknij, aby zobaczyć pozycje' : 'Kliknij, aby zobaczyć pozycje'}
                     >
                       <TableCell className="text-center text-gray-800">{formatDocDate(row.data)}</TableCell>
-                      <TableCell className="text-center font-medium text-gray-900">{row.numer || '-'}</TableCell>
+                      <TableCell className="text-center font-medium text-gray-900">
+                        <span className="inline-flex items-center gap-1.5">
+                          {row.assigned_cost_id !== null && (
+                            <Check className="h-4 w-4 text-green-600" aria-label="Przypisany" />
+                          )}
+                          {row.numer || '-'}
+                        </span>
+                      </TableCell>
                       <TableCell className="text-center text-gray-500 max-w-0 truncate" title={(row.numer_obcy || '').trim()}>{(row.numer_obcy || '-').trim()}</TableCell>
                       <TableCell className="text-left text-gray-800 max-w-0 truncate" title={(row.nazwa_skrocona || '').trim()}>{(row.nazwa_skrocona || '-').trim()}</TableCell>
                       <TableCell className="text-center text-gray-600">{row.nip || '-'}</TableCell>
                       <TableCell className="text-center font-bold text-gray-900">{formatCurrency(row.netto)}</TableCell>
                       <TableCell className="text-center font-bold text-blue-700">{formatCurrency(row.brutto)}</TableCell>
                       <TableCell className="text-center">
-                        <span className="inline-flex justify-center items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                          {(row.oddzial || '-').trim()}
+                        <span className={`inline-flex justify-center items-center px-2 py-1 rounded-full text-xs font-medium ${branchBadgeClass(row.oddzial)}`}>
+                          {row.oddzial_display || '-'}
                         </span>
                       </TableCell>
                       <TableCell className="text-center">
@@ -448,8 +665,6 @@ const CostsViewIluo = () => {
       </Card>
 
       {/* ===================== MODAL SZCZEGÓŁÓW ===================== */}
-      {/* Renderowany przez portal do document.body — inaczej overlay nie przykryje
-          headera AdminLayout (header jest rodzeństwem <main>, nie rodzicem). */}
       {mounted && isModalOpen && createPortal(
         <div
           className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/75 backdrop-blur-md"
@@ -470,7 +685,6 @@ const CostsViewIluo = () => {
               </button>
 
               <div className="flex items-end justify-between gap-6 pr-10">
-                {/* Lewa: identyfikacja dokumentu */}
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 text-blue-100 text-xs font-medium mb-2">
                     <Receipt className="h-3.5 w-3.5" />
@@ -495,8 +709,6 @@ const CostsViewIluo = () => {
                     </div>
                   )}
                 </div>
-
-                {/* Prawa: data po prawej stronie nagłówka */}
               </div>
             </div>
 
@@ -514,19 +726,13 @@ const CostsViewIluo = () => {
                 </Alert>
               ) : detail ? (
                 <>
-                  {/* Metryki nagłówka — karty z ikonami */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+                  {/* Metryki nagłówka — karty z ikonami (bez oddziału: definiuje go numer dokumentu) */}
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-6">
                     <div className="bg-gradient-to-br from-gray-50 to-gray-100/50 rounded-2xl p-4 border border-gray-100">
                       <div className="flex items-center gap-1.5 text-xs text-gray-400 font-medium mb-1.5">
                         <Hash className="h-3.5 w-3.5" /> NIP
                       </div>
                       <div className="text-sm font-semibold text-gray-900">{detail.header.nip || '-'}</div>
-                    </div>
-                    <div className="bg-gradient-to-br from-blue-50 to-indigo-50/50 rounded-2xl p-4 border border-blue-100">
-                      <div className="flex items-center gap-1.5 text-xs text-blue-400 font-medium mb-1.5">
-                        <Building2 className="h-3.5 w-3.5" /> Oddział
-                      </div>
-                      <div className="text-sm font-semibold text-blue-900">{(detail.header.oddzial || '-').trim()}</div>
                     </div>
                     <div className="bg-gradient-to-br from-gray-50 to-gray-100/50 rounded-2xl p-4 border border-gray-100">
                       <div className="flex items-center gap-1.5 text-xs text-gray-400 font-medium mb-1.5">
@@ -577,6 +783,87 @@ const CostsViewIluo = () => {
                       </tfoot>
                     </table>
                   </div>
+
+                  {/* ============ SEKCJA PRZYPISANIA (krok 4c) ============ */}
+                  <div className="mt-6 rounded-2xl border border-gray-200 p-5 bg-gray-50/50">
+                    {detail.header.assigned_cost_id !== null ? (
+                      /* Dokument już przypisany — plakietka statusu */
+                      <div className="flex items-center gap-3">
+                        <span className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold bg-green-100 text-green-800 border border-green-300">
+                          <Check className="h-4 w-4" />
+                          Przypisany · koszt #{detail.header.assigned_cost_id}
+                        </span>
+                        <span className="text-sm text-gray-500">
+                          {detail.header.assigned_by || ''}
+                          {detail.header.assigned_at ? ` · ${detail.header.assigned_at.slice(0, 10)}` : ''}
+                        </span>
+                      </div>
+                    ) : (
+                      /* Formularz przypisania — selecty poziomo + badge oddziału */
+                      <>
+                        <h4 className="text-sm font-medium text-gray-600 mb-3">
+                          Przypisanie kosztu
+                          {detail.header.prowizja && (
+                            <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-300">
+                              Wypłata prowizji
+                            </span>
+                          )}
+                        </h4>
+                        <div className="flex flex-wrap items-center gap-3">
+                          <select
+                            value={assignOwner}
+                            onChange={(e) => handleOwnerChange(e.target.value)}
+                            className="h-11 min-w-[180px] border-gray-200 border-2 rounded-lg text-gray-800 px-3 bg-white cursor-pointer"
+                          >
+                            <option value="">Właściciel kosztu</option>
+                            {(detail.header.prowizja ? COMMISSION_COST_OWNERS : COST_OWNERS).map(owner => (
+                              <option key={owner} value={owner}>{owner}</option>
+                            ))}
+                          </select>
+
+                          <select
+                            value={assignPh}
+                            onChange={(e) => { setAssignPh(e.target.value); setAssignError(null); }}
+                            disabled={isPhDisabled}
+                            className={`h-11 min-w-[180px] border-gray-200 border-2 rounded-lg px-3 ${
+                              isPhDisabled ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-800 cursor-pointer'
+                            }`}
+                          >
+                            <option value="">
+                              {assignOwner === 'Przedstawiciel' ? 'Wybierz przedstawiciela' : 'Brak przedstawiciela'}
+                            </option>
+                            {representatives.map(rep => (
+                              <option key={rep} value={rep}>{rep}</option>
+                            ))}
+                          </select>
+
+                          <div className="ml-auto">
+                            <button
+                              type="button"
+                              onClick={handleAssign}
+                              disabled={assignLoading}
+                              className={`h-11 px-5 rounded-lg text-sm font-medium text-white ${
+                                assignLoading ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
+                              }`}
+                            >
+                              {assignLoading ? (
+                                <span className="inline-flex items-center gap-2">
+                                  <Loader2 className="h-4 w-4 animate-spin" /> Przypisywanie...
+                                </span>
+                              ) : (
+                                'Przypisz koszt'
+                              )}
+                            </button>
+                          </div>
+                        </div>
+
+                        {assignError && (
+                          <p className="mt-2 text-sm text-red-600">{assignError}</p>
+                        )}
+                      </>
+                    )}
+                  </div>
+                  {/* ============ KONIEC SEKCJI PRZYPISANIA ============ */}
                 </>
               ) : null}
             </div>

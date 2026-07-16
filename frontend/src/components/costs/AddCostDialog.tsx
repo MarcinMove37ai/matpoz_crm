@@ -81,6 +81,13 @@ const departments = [
   { value: "Private", label: "Prywatny" }
 ];
 
+// KROK 6: ręczne dodawanie to ścieżka rezerwowa — koszty fakturowe wchodzą
+// przez ILUO. Biała lista rodzajów (wpisy muszą istnieć w cost_kinds):
+const MANUAL_COST_KINDS = ["Dokument RW", "Wypłata UOP/UZ/UD", "Inne"];
+// Prowizja wyłącznie przez checkbox "Wypłata prowizji" — zapisuje 'Wypłata'
+// (marker mechaniki liczenia), w selekcie pokazujemy etykietę "Wypłata prowizji".
+const COMMISSION_KIND_ITEM = { value: "Wypłata", label: "Wypłata prowizji" };
+
 const AddCostDialog: React.FC<AddCostDialogProps> = ({
   onAddCost,
   representatives: providedRepresentatives,
@@ -798,10 +805,9 @@ const AddCostDialog: React.FC<AddCostDialogProps> = ({
                   onValueChange={(value) => handleInputChange('costType', value)}
                   placeholder="Wybierz rodzaj kosztu"
                   disabled={isCommissionPayment}
-                  items={costTypes.map(type => ({
-                    value: type.kind,
-                    label: type.kind
-                  }))}
+                  items={isCommissionPayment
+                    ? [COMMISSION_KIND_ITEM]
+                    : MANUAL_COST_KINDS.map(kind => ({ value: kind, label: kind }))}
                   emptyMessage="Nie znaleziono rodzaju kosztu"
                 />
                 {errors.costType && (
@@ -909,7 +915,7 @@ const AddCostDialog: React.FC<AddCostDialogProps> = ({
                 </label>
               </div>
 
-              {userRole === 'ADMIN' && (
+              {(userRole === 'ADMIN' || userRole === 'BOARD') && (
                 <div className="flex items-center space-x-2">
                   <Checkbox
                     id="private-cost"

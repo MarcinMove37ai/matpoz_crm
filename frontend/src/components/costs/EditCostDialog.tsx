@@ -195,6 +195,22 @@ const EditCostDialog: React.FC<EditCostDialogProps> = ({
     { value: "Private", label: "Prywatny" }
   ];
 
+  // KROK 6: biała lista rodzajów jak w AddCostDialog; koszt historyczny
+  // z rodzajem spoza listy zachowuje swoją wartość (dopisana do items,
+  // żeby dało się zapisać bez wymuszonej zmiany rodzaju).
+  const MANUAL_COST_KINDS = ["Dokument RW", "Wypłata UOP/UZ/UD", "Inne"];
+  const COMMISSION_KIND_ITEM = { value: "Wypłata", label: "Wypłata prowizji" };
+  const costTypeItems = isCommissionPayment
+    ? [COMMISSION_KIND_ITEM]
+    : [
+        ...(cost?.cost_kind
+            && !MANUAL_COST_KINDS.includes(cost.cost_kind)
+            && cost.cost_kind !== 'Wypłata'
+          ? [{ value: cost.cost_kind, label: cost.cost_kind }]
+          : []),
+        ...MANUAL_COST_KINDS.map(kind => ({ value: kind, label: kind })),
+      ];
+
     const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({
       ...prev,
@@ -703,10 +719,7 @@ const EditCostDialog: React.FC<EditCostDialogProps> = ({
                   onValueChange={(value) => handleInputChange('costType', value)}
                   placeholder="Wybierz rodzaj kosztu"
                   disabled={isCommissionPayment}
-                  items={costTypes.map(type => ({
-                    value: type.kind,
-                    label: type.kind
-                  }))}
+                  items={costTypeItems}
                   emptyMessage="Nie znaleziono rodzaju kosztu"
                 />
                 {errors.costType && (
@@ -813,7 +826,7 @@ const EditCostDialog: React.FC<EditCostDialogProps> = ({
                 </label>
               </div>
 
-              {userRole === 'ADMIN' && (
+              {(userRole === 'ADMIN' || userRole === 'BOARD') && (
                 <div className="flex items-center space-x-2">
                   <Checkbox
                     id="private-cost"
